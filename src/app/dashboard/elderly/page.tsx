@@ -194,8 +194,17 @@ export default function ElderlyDashboard() {
         };
         setChatHistory((prev) => [...prev, assistantMsg]);
 
-        // Speak response aloud
-        speakText(replyText, voiceLanguage);
+        // Play Gnani.ai Timbre synthesized audio or fallback to Web Speech
+        if (json.data.audioBase64) {
+          try {
+            const audio = new Audio(json.data.audioBase64);
+            audio.play().catch(() => speakText(replyText, voiceLanguage));
+          } catch {
+            speakText(replyText, voiceLanguage);
+          }
+        } else {
+          speakText(replyText, voiceLanguage);
+        }
 
         // Clinical Safety Rule: Voice alone NEVER marks dose as taken
         if (json.data.requiresVisualTap) {

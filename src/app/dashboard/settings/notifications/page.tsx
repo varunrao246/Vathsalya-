@@ -11,6 +11,10 @@ import {
   Clock,
   ArrowLeft,
   Loader2,
+  Volume2,
+  Mail,
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { useDashboard } from "@/context/DashboardContext";
 
@@ -36,11 +40,34 @@ export default function NotificationSettingsPage() {
 
   // Preference fields
   const [telegramEnabled, setTelegramEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceLanguage, setVoiceLanguage] = useState<"kn" | "en">("kn");
+  const [testingVoice, setTestingVoice] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [overdueCaretakerGraceMinutes, setOverdueCaretakerGraceMinutes] = useState(30);
   const [familyEscalationGraceMinutes, setFamilyEscalationGraceMinutes] = useState(60);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleTestVoice = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    setTestingVoice(true);
+    try {
+      window.speechSynthesis.cancel();
+      const promptText =
+        voiceLanguage === "kn"
+          ? "ನಮಸ್ಕಾರ! ನಿಮ್ಮ ನಿಗದಿತ ಮಾತ್ರೆ ತೆಗೆದುಕೊಳ್ಳುವ ಸಮಯವಾಗಿದೆ. ನೀವು ಮಾತ್ರೆ ತೆಗೆದುಕೊಂಡಿದ್ದೀರಾ?"
+          : "Namaste! It is time for your scheduled medication. Have you taken your tablet?";
+      const utterance = new SpeechSynthesisUtterance(promptText);
+      utterance.lang = voiceLanguage === "kn" ? "kn-IN" : "en-IN";
+      utterance.rate = 0.92;
+      utterance.onend = () => setTestingVoice(false);
+      utterance.onerror = () => setTestingVoice(false);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setTestingVoice(false);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -294,6 +321,110 @@ export default function NotificationSettingsPage() {
             <div className="p-3 rounded-xl bg-[#FDFBF7] border border-[#EFECE6] text-xs text-[#5C6460] flex items-center gap-2">
               <Shield className="w-4 h-4 text-[#607B6E] shrink-0" />
               <span>End-to-end encrypted notification channel via Telegram Bot API.</span>
+            </div>
+          </div>
+
+          {/* Voice Reminders Settings Card */}
+          <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold">
+                  <Volume2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#1E3A2F]">Voice Medication Reminders</h2>
+                  <p className="text-xs text-[#5C6460]">Channel A: Gnani.ai &amp; Web Speech</p>
+                </div>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full font-bold border bg-emerald-50 text-emerald-800 border-emerald-200">
+                Operational
+              </span>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t border-[#EFECE6]">
+              <div className="flex items-center justify-between text-xs font-bold text-[#1E3A2F]">
+                <span>Enable Elderly Voice Prompts</span>
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => setVoiceEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#1E3A2F] accent-[#1E3A2F]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1F2421]">Preferred Voice Language</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceLanguage("kn")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-colors ${
+                      voiceLanguage === "kn"
+                        ? "bg-[#1E3A2F] text-white border-[#1E3A2F]"
+                        : "bg-white text-[#5C6460] border-[#EFECE6] hover:bg-[#FAF8F5]"
+                    }`}
+                  >
+                    ಕನ್ನಡ (Kannada)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVoiceLanguage("en")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-colors ${
+                      voiceLanguage === "en"
+                        ? "bg-[#1E3A2F] text-white border-[#1E3A2F]"
+                        : "bg-white text-[#5C6460] border-[#EFECE6] hover:bg-[#FAF8F5]"
+                    }`}
+                  >
+                    English
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestVoice}
+                  disabled={testingVoice}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] hover:bg-[#EBF2EE] text-[#1E3A2F] text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <span>{testingVoice ? "Playing Voice Sample..." : "Test Spoken Reminder Sample"}</span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-[#5C6460]">
+                Strict Safety Rule: Voice alone never marks a dose as taken. Seniors must tap the on-screen button to record ingestion.
+              </p>
+            </div>
+          </div>
+
+          {/* Email Notification Channel Status Card (Explicit Transparency) */}
+          <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#1E3A2F]">Email Notifications</h2>
+                  <p className="text-xs text-[#5C6460]">Channel C: Transactional Alerts</p>
+                </div>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full font-bold border bg-amber-50 text-amber-800 border-amber-200">
+                Requires Approval
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-[#EFECE6] text-xs text-[#5C6460]">
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-950 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Dedicated SMTP Provider Required</p>
+                  <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
+                    Supabase built-in email service is restricted exclusively to user authentication, password resets, and email verification. Medication reminder delivery requires an authorized external SMTP relay (e.g., AWS SES or SendGrid). Resend has been retired per user instructions.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

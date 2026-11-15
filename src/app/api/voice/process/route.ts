@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { synthesizeGnaniTTS } from "@/lib/voice/gnani";
 
 export const dynamic = "force-dynamic";
 
@@ -226,6 +227,13 @@ export async function POST(req: Request) {
     const spokenText =
       language === "kn" ? result.spokenResponseKannada : result.spokenResponseEnglish;
 
+    // Synthesize audio using Gnani.ai Timbre TTS with graceful Web Speech fallback
+    const ttsResult = await synthesizeGnaniTTS({
+      text: spokenText,
+      language: language as "kn" | "en",
+      gender: "female",
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -233,6 +241,8 @@ export async function POST(req: Request) {
         spokenText,
         requiresVisualTap: result.requiresVisualTap,
         notes: result.notes,
+        audioBase64: ttsResult.audioBase64 || null,
+        voiceEngine: ttsResult.source,
       },
     });
   } catch (err: unknown) {
