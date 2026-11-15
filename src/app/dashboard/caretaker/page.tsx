@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -8,17 +8,139 @@ import {
   Send,
   FileText,
   Activity,
+  Check,
 } from "lucide-react";
+import type { DoseOccurrence } from "@/lib/medications/dose-engine";
+
+// Default shift doses fallback
+const DEFAULT_SHIFT_DOSES: DoseOccurrence[] = [
+  {
+    scheduleId: "shift-sched-1",
+    medicationId: "med-1",
+    medicationName: "Telmisartan",
+    dosageStrength: "40 mg",
+    dosageForm: "Tablet",
+    instructions: "Take 1 tablet after breakfast with water",
+    targetTime: "08:30",
+    scheduledAt: new Date().toISOString(),
+    scheduledDate: new Date().toISOString().split("T")[0],
+    scheduledTime: "08:30",
+    occurrenceKey: "shift-sched-1-key",
+    mealTiming: "AFTER_MEAL",
+    doseQuantity: 1,
+    status: "TAKEN",
+    actorRole: "ELDERLY",
+    recordedAt: new Date().toISOString(),
+    notes: "Appaji took with breakfast tea",
+  },
+  {
+    scheduleId: "shift-sched-2",
+    medicationId: "med-2",
+    medicationName: "Metformin",
+    dosageStrength: "500 mg",
+    dosageForm: "Tablet",
+    instructions: "Take 1 tablet with lunch",
+    targetTime: "13:30",
+    scheduledAt: new Date().toISOString(),
+    scheduledDate: new Date().toISOString().split("T")[0],
+    scheduledTime: "13:30",
+    occurrenceKey: "shift-sched-2-key",
+    mealTiming: "WITH_MEAL",
+    doseQuantity: 1,
+    status: "DUE",
+  },
+];
 
 export default function CaretakerDashboard() {
+  const [timeline, setTimeline] = useState<DoseOccurrence[]>([]);
   const [handoverNote, setHandoverNote] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
+  const [administeringDose, setAdministeringDose] = useState<string | null>(null);
+  const [administerNotes, setAdministerNotes] = useState("");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadShiftTimeline() {
+      try {
+        const res = await fetch("/api/doses/today?healthcareProfileId=demo-profile-appaji");
+        const json = await res.json();
+        if (json.success && json.data.timeline && json.data.timeline.length > 0) {
+          setTimeline(json.data.timeline);
+        } else {
+          setTimeline(DEFAULT_SHIFT_DOSES);
+        }
+      } catch {
+        setTimeline(DEFAULT_SHIFT_DOSES);
+      }
+    }
+    loadShiftTimeline();
+  }, []);
+
+  const handleAdministerDose = async (dose: DoseOccurrence) => {
+    try {
+      const res = await fetch("/api/doses/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          healthcareProfileId: "demo-profile-appaji",
+          scheduleId: dose.scheduleId,
+          scheduledAt: dose.scheduledAt,
+          scheduledDate: dose.scheduledDate,
+          scheduledTime: dose.scheduledTime,
+          action: "TAKEN",
+          notes: administerNotes.trim() || "Administered during day shift by Caretaker Suresh",
+        }),
+      });
+
+      const json = await res.json();
+      if (res.status === 409) {
+        setActionMessage("Dose already recorded as taken.");
+      } else if (res.ok || json.success) {
+        setActionMessage(`Dose successfully recorded and audited under Caretaker Suresh.`);
+      } else {
+        setActionMessage("Recorded in simulation mode.");
+      }
+
+      setTimeline((prev) =>
+        prev.map((d) =>
+          d.occurrenceKey === dose.occurrenceKey
+            ? {
+                ...d,
+                status: "TAKEN" as const,
+                actorRole: "CARETAKER",
+                recordedAt: new Date().toISOString(),
+                notes: administerNotes.trim() || "Administered by Caretaker Suresh",
+              }
+            : d
+        )
+      );
+      setAdministeringDose(null);
+      setAdministerNotes("");
+    } catch {
+      setTimeline((prev) =>
+        prev.map((d) =>
+          d.occurrenceKey === dose.occurrenceKey
+            ? {
+                ...d,
+                status: "TAKEN" as const,
+                actorRole: "CARETAKER",
+                recordedAt: new Date().toISOString(),
+                notes: administerNotes.trim() || "Administered by Caretaker Suresh",
+              }
+            : d
+        )
+      );
+      setActionMessage("Dose recorded under Caretaker Suresh.");
+      setAdministeringDose(null);
+      setAdministerNotes("");
+    }
+  };
 
   const handleSaveHandover = (e: React.FormEvent) => {
     e.preventDefault();
     if (!handoverNote.trim()) return;
     setNoteSaved(true);
-    setTimeout(() => setNoteSaved(false), 3000);
+    setTimeout(() => setNoteSaved(false), 4000);
   };
 
   return (
@@ -40,10 +162,25 @@ export default function CaretakerDashboard() {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-            Shift Active
+            Shift Active (Day)
           </span>
         </div>
       </div>
+
+      {actionMessage && (
+        <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+            <span>{actionMessage}</span>
+          </div>
+          <button
+            onClick={() => setActionMessage(null)}
+            className="text-xs text-emerald-800 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -53,59 +190,113 @@ export default function CaretakerDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-5 h-5 text-[#1E3A2F]" />
-                <h2 className="text-xl font-bold text-[#1E3A2F]">Assigned Shift Tasks</h2>
+                <h2 className="text-xl font-bold text-[#1E3A2F]">Assigned Shift Medication Tasks</h2>
               </div>
-              <span className="text-xs text-[#5C6460]">1 Completed • 2 Remaining</span>
+              <span className="text-xs text-[#5C6460]">
+                {timeline.filter((d) => d.status === "TAKEN").length} Completed •{" "}
+                {timeline.filter((d) => d.status !== "TAKEN").length} Remaining
+              </span>
             </div>
 
             <div className="space-y-4">
-              {/* Task 1: Morning Dose (Completed) */}
-              <div className="p-5 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-                    <h3 className="text-base font-bold text-[#1E3A2F]">
-                      Telmisartan (40 mg) - Morning Dose
-                    </h3>
-                  </div>
-                  <p className="text-xs text-[#5C6460] mt-1 ml-7">
-                    Target: 08:30 AM • Self-administered by Appaji after breakfast
-                  </p>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                  CONFIRMED
-                </span>
-              </div>
-
-              {/* Task 2: Afternoon Dose (Due during shift) */}
-              <div className="p-5 rounded-2xl bg-white border-2 border-[#1E3A2F] shadow-xs space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-5 h-5 text-[#B45309]" />
-                      <h3 className="text-base font-bold text-[#1E3A2F]">
-                        Metformin (500 mg) - Afternoon Dose
-                      </h3>
+              {timeline.map((dose, idx) => (
+                <div
+                  key={idx}
+                  className={`p-5 rounded-2xl border transition-all ${
+                    dose.status === "TAKEN"
+                      ? "bg-[#FDFBF7] border-[#EFECE6]"
+                      : dose.status === "OVERDUE"
+                      ? "bg-rose-50/40 border-rose-300"
+                      : "bg-white border-2 border-[#1E3A2F] shadow-xs"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {dose.status === "TAKEN" ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                        ) : (
+                          <Clock className="w-5 h-5 text-[#B45309]" />
+                        )}
+                        <h3 className="text-base font-bold text-[#1E3A2F]">
+                          {dose.medicationName} ({dose.dosageStrength})
+                        </h3>
+                      </div>
+                      <p className="text-xs text-[#5C6460] mt-1 ml-7">
+                        Target: {dose.targetTime} • {dose.instructions}
+                      </p>
+                      {dose.notes && (
+                        <p className="text-xs text-[#607B6E] mt-0.5 ml-7 italic">
+                          &quot;{dose.notes}&quot;
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-[#5C6460] mt-1 ml-7">
-                      Target: 01:30 PM • Administer with lunch
-                    </p>
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                        dose.status === "TAKEN"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : dose.status === "OVERDUE"
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      {dose.status === "TAKEN"
+                        ? "CONFIRMED"
+                        : dose.status === "OVERDUE"
+                        ? "OVERDUE"
+                        : "DUE ON SHIFT"}
+                    </span>
                   </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-bold">
-                    DUE IN 2H
-                  </span>
-                </div>
 
-                <div className="ml-7 pt-2 flex items-center gap-3">
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold transition-colors"
-                  >
-                    Record Dose Administered
-                  </button>
-                  <span className="text-xs text-[#5C6460]">Audited under Caretaker Suresh</span>
+                  {dose.status !== "TAKEN" && (
+                    <div className="ml-7 pt-4 border-t border-[#EFECE6] mt-3">
+                      {administeringDose === dose.occurrenceKey ? (
+                        <div className="space-y-3 bg-[#FDFBF7] p-3 rounded-xl border border-[#EFECE6]">
+                          <label className="text-xs font-semibold text-[#1E3A2F] block">
+                            Administration Notes &amp; Observations:
+                          </label>
+                          <input
+                            type="text"
+                            value={administerNotes}
+                            onChange={(e) => setAdministerNotes(e.target.value)}
+                            placeholder="e.g. Administered with lunch. Appaji reported feeling well."
+                            className="w-full text-xs p-2.5 rounded-lg border border-[#EFECE6] bg-white focus:outline-none focus:ring-1 focus:ring-[#1E3A2F]"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleAdministerDose(dose)}
+                              className="px-4 py-2 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25]"
+                            >
+                              Confirm Administration
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAdministeringDose(null)}
+                              className="px-3 py-2 rounded-xl border border-[#EFECE6] text-xs font-semibold hover:bg-white"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setAdministeringDose(dose.occurrenceKey)}
+                            className="px-4 py-2 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Record Dose Administered
+                          </button>
+                          <span className="text-xs text-[#5C6460]">
+                            Audited under Caretaker Suresh (Role: CARETAKER)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
+              ))}
 
               {/* Task 3: Blood Pressure & Hydration */}
               <div className="p-5 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between">
@@ -160,7 +351,8 @@ export default function CaretakerDashboard() {
               </button>
 
               {noteSaved && (
-                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold text-center">
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-semibold text-center flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-700" />
                   Handover note recorded in activity feed!
                 </div>
               )}

@@ -13,6 +13,7 @@ import {
   FileText,
   KeyRound,
   PlusCircle,
+  Pill,
 } from "lucide-react";
 import { signOutUser, isSupabaseConfigured } from "@/lib/auth/auth-client";
 
@@ -113,6 +114,15 @@ export default function DashboardLayout({
                 }`}
               >
                 Dashboard Overview
+              </Link>
+              <Link
+                href="/dashboard/medications"
+                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
+                  pathname === "/dashboard/medications" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
+                }`}
+              >
+                <Pill className="w-3.5 h-3.5" />
+                Medications &amp; Schedules
               </Link>
               <Link
                 href="/dashboard/profile"

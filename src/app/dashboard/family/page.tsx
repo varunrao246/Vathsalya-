@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -6,9 +9,38 @@ import {
   Shield,
   UserPlus,
   Pill,
+  Calendar,
+  ChevronRight,
+  TrendingUp,
 } from "lucide-react";
+import type { DoseOccurrence } from "@/lib/medications/dose-engine";
 
 export default function FamilyDashboard() {
+  const [timeline, setTimeline] = useState<DoseOccurrence[]>([]);
+  const [adherence, setAdherence] = useState({ total: 3, taken: 1, percent: 94 });
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch("/api/doses/today?healthcareProfileId=demo-profile-appaji");
+        const json = await res.json();
+        if (json.success && json.data.timeline) {
+          setTimeline(json.data.timeline);
+          if (json.data.summary) {
+            setAdherence({
+              total: json.data.summary.total,
+              taken: json.data.summary.taken,
+              percent: json.data.summary.adherencePercentage,
+            });
+          }
+        }
+      } catch {
+        // Fallback default timeline
+      }
+    }
+    loadData();
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* Header Context */}
@@ -25,13 +57,20 @@ export default function FamilyDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/dashboard/medications"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3A2F] text-white text-sm font-semibold hover:bg-[#162E25] shadow-xs"
+          >
+            <Pill className="w-4 h-4 text-[#EBF2EE]" />
+            Manage Medications &amp; Schedules
+          </Link>
           <Link
             href="/join"
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#EFECE6] bg-white text-sm font-semibold text-[#1E3A2F] hover:border-[#607B6E] shadow-xs"
           >
             <UserPlus className="w-4 h-4 text-[#607B6E]" />
-            Invite Caretaker (Passcode)
+            Invite Member (Passcode)
           </Link>
         </div>
       </div>
@@ -39,11 +78,14 @@ export default function FamilyDashboard() {
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs">
-          <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-            7-Day Adherence
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
+              7-Day Adherence
+            </span>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+          </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-4xl font-extrabold text-[#1E3A2F]">94%</span>
+            <span className="text-4xl font-extrabold text-[#1E3A2F]">{adherence.percent}%</span>
             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
               +4% vs last week
             </span>
@@ -54,11 +96,16 @@ export default function FamilyDashboard() {
         </div>
 
         <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs">
-          <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-            Today&apos;s Doses
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
+              Today&apos;s Doses
+            </span>
+            <Clock className="w-4 h-4 text-[#607B6E]" />
+          </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-4xl font-extrabold text-[#1E3A2F]">1 of 3</span>
+            <span className="text-4xl font-extrabold text-[#1E3A2F]">
+              {adherence.taken} of {adherence.total}
+            </span>
             <span className="text-xs font-semibold text-[#607B6E]">Taken</span>
           </div>
           <p className="mt-2 text-xs text-[#5C6460]">
@@ -67,9 +114,12 @@ export default function FamilyDashboard() {
         </div>
 
         <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs">
-          <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-            Next Consultation
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
+              Next Consultation
+            </span>
+            <Calendar className="w-4 h-4 text-[#607B6E]" />
+          </div>
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-xl font-extrabold text-[#1E3A2F]">Wednesday</span>
             <span className="text-sm font-medium text-[#5C6460]">10:30 AM</span>
@@ -102,69 +152,151 @@ export default function FamilyDashboard() {
         </div>
       </div>
 
-      {/* Today's Evaluated Timeline & Collaborator Status */}
+      {/* Today's Evaluated Timeline & Connected Members */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Medication Timeline */}
         <div className="lg:col-span-2 p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-[#1E3A2F]">Today&apos;s Medication Timeline</h2>
-            <span className="text-xs text-[#5C6460] font-medium">Sunday, 15 November</span>
+            <div>
+              <h2 className="text-xl font-bold text-[#1E3A2F]">Today&apos;s Medication Timeline</h2>
+              <p className="text-xs text-[#5C6460] mt-0.5">Sunday, 15 November • Evaluated in real-time</p>
+            </div>
+            <Link
+              href="/dashboard/medications"
+              className="text-xs font-bold text-[#1E3A2F] hover:text-[#162E25] flex items-center gap-1"
+            >
+              <span>Manage Schedules</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           <div className="space-y-4">
-            {/* Dose 1: Taken */}
-            <div className="p-4 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1E3A2F]">Telmisartan 40mg</h3>
-                  <p className="text-xs text-[#5C6460]">08:30 AM • After Breakfast</p>
-                </div>
-              </div>
-              <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
-                TAKEN at 08:35 AM (by Appaji)
-              </span>
-            </div>
+            {timeline.length > 0 ? (
+              timeline.map((dose, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
+                    dose.status === "TAKEN"
+                      ? "bg-[#FDFBF7] border-[#EFECE6]"
+                      : dose.status === "DUE"
+                      ? "bg-amber-50/40 border-amber-300"
+                      : dose.status === "OVERDUE"
+                      ? "bg-rose-50/40 border-rose-300"
+                      : "bg-[#FDFBF7] border-[#EFECE6] opacity-85"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                        dose.status === "TAKEN"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : dose.status === "OVERDUE"
+                          ? "bg-rose-100 text-rose-800"
+                          : dose.status === "DUE"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-[#EBF2EE] text-[#1E3A2F]"
+                      }`}
+                    >
+                      {dose.status === "TAKEN" ? (
+                        <CheckCircle2 className="w-5 h-5" />
+                      ) : (
+                        <Clock className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1E3A2F]">
+                        {dose.medicationName} {dose.dosageStrength}
+                      </h3>
+                      <p className="text-xs text-[#5C6460]">
+                        {dose.targetTime} • {dose.instructions}
+                      </p>
+                    </div>
+                  </div>
 
-            {/* Dose 2: Due / Upcoming */}
-            <div className="p-4 rounded-2xl bg-white border-2 border-amber-300 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                  <Clock className="w-5 h-5" />
+                  <div>
+                    {dose.status === "TAKEN" ? (
+                      <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                        TAKEN {dose.recordedAt ? `at ${new Date(dose.recordedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""} ({dose.actorRole === "CARETAKER" ? "by Caretaker Suresh" : "by Appaji"})
+                      </span>
+                    ) : dose.status === "OVERDUE" ? (
+                      <span className="text-xs px-3 py-1 rounded-full bg-rose-50 text-rose-800 font-bold border border-rose-200">
+                        OVERDUE
+                      </span>
+                    ) : dose.status === "DUE" ? (
+                      <span className="text-xs px-3 py-1 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                        DUE NOW
+                      </span>
+                    ) : (
+                      <span className="text-xs px-3 py-1 rounded-full bg-[#EBF2EE] text-[#5C6460] font-bold">
+                        UPCOMING
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1E3A2F]">Metformin 500mg</h3>
-                  <p className="text-xs text-[#5C6460]">01:30 PM • With Lunch</p>
+              ))
+            ) : (
+              <>
+                {/* Fallback Display if API is in preview mode */}
+                <div className="p-4 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1E3A2F]">Telmisartan 40mg</h3>
+                      <p className="text-xs text-[#5C6460]">08:30 AM • After Breakfast</p>
+                    </div>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                    TAKEN at 08:35 AM (by Appaji)
+                  </span>
                 </div>
-              </div>
-              <span className="text-xs px-3 py-1 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200">
-                UPCOMING
-              </span>
-            </div>
 
-            {/* Dose 3: Night */}
-            <div className="p-4 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between opacity-80">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center font-bold">
-                  <Pill className="w-5 h-5" />
+                <div className="p-4 rounded-2xl bg-white border-2 border-amber-300 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1E3A2F]">Metformin 500mg</h3>
+                      <p className="text-xs text-[#5C6460]">01:30 PM • With Lunch</p>
+                    </div>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                    UPCOMING
+                  </span>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1E3A2F]">Metformin 500mg</h3>
-                  <p className="text-xs text-[#5C6460]">08:30 PM • With Dinner</p>
+
+                <div className="p-4 rounded-2xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between opacity-80">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center font-bold">
+                      <Pill className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-[#1E3A2F]">Metformin 500mg</h3>
+                      <p className="text-xs text-[#5C6460]">08:30 PM • With Dinner</p>
+                    </div>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-[#EBF2EE] text-[#5C6460] font-bold">
+                    UPCOMING
+                  </span>
                 </div>
-              </div>
-              <span className="text-xs px-3 py-1 rounded-full bg-[#EBF2EE] text-[#5C6460] font-bold">
-                UPCOMING
-              </span>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Care Circle & Notification Status */}
+        {/* Connected Members & Notification Status */}
         <div className="p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6">
-          <h2 className="text-xl font-bold text-[#1E3A2F]">Connected Members</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-[#1E3A2F]">Connected Members</h2>
+            <Link
+              href="/dashboard/members"
+              className="text-xs font-bold text-[#607B6E] hover:text-[#1E3A2F]"
+            >
+              View All
+            </Link>
+          </div>
           <div className="space-y-3">
             <div className="p-3 rounded-xl bg-[#FDFBF7] border border-[#EFECE6] flex items-center justify-between">
               <div>
