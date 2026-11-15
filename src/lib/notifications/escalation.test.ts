@@ -636,7 +636,7 @@ describe("Milestone 5: Smart Care Escalation & Multi-Channel Notifications Test 
       delete process.env.TELEGRAM_BOT_TOKEN;
       expect(isTelegramConfigured()).toBe(false);
 
-      process.env.TELEGRAM_BOT_TOKEN = "9222485860:AAF8zvOa-aKY2Rr_9U_l4dl85-h8Pz6rBnQ";
+      process.env.TELEGRAM_BOT_TOKEN = "987654321:AAFakeDummyBotTokenForTestingPurposes123";
       expect(isTelegramConfigured()).toBe(true);
     } finally {
       process.env.TELEGRAM_BOT_TOKEN = originalToken;
