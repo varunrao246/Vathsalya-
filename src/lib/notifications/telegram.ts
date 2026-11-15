@@ -19,6 +19,7 @@ export function isTelegramConfigured(): boolean {
   const { botToken } = getTelegramConfig();
   return Boolean(
     botToken &&
+      botToken !== "undefined" &&
       !botToken.includes("placeholder") &&
       !botToken.startsWith("123456789:")
   );

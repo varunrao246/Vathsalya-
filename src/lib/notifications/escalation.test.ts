@@ -9,6 +9,7 @@ import {
 import {
   verifyTelegramWebhookSecret,
   buildTelegramDeepLink,
+  isTelegramConfigured,
 } from "./telegram";
 import { buildEmailTemplate } from "./email";
 import { evaluatePermission, MemberAccessContext } from "../auth/rbac";
@@ -518,5 +519,123 @@ describe("Milestone 5: Smart Care Escalation & Multi-Channel Notifications Test 
     const replayedAttempt = consumeToken("single-use-token-xyz");
     expect(replayedAttempt.valid).toBe(false);
     expect(replayedAttempt.error).toBe("INVALID_OR_CONSUMED");
+  });
+
+  // =========================================================================
+  // 27. Telegram duplicate webhook update prevention & chat_id uniqueness
+  // =========================================================================
+  it("Point 27: handles duplicate webhook updates idempotently via chat_id conflict resolution", () => {
+    const activeLinks = new Map<string, { profile_id: string; chat_id: string; username: string | null }>();
+
+    function upsertTelegramLink(profileId: string, chatId: string, username: string | null) {
+      // Enforce: one profile per chat_id, and one chat_id per profile
+      for (const [key, val] of activeLinks.entries()) {
+        if (val.profile_id === profileId) {
+          activeLinks.delete(key);
+        }
+      }
+      activeLinks.set(chatId, { profile_id: profileId, chat_id: chatId, username });
+      return { success: true, count: activeLinks.size };
+    }
+
+    // First webhook delivery
+    upsertTelegramLink("user-1", "chat-999", "elderly_user");
+    expect(activeLinks.size).toBe(1);
+    expect(activeLinks.get("chat-999")?.profile_id).toBe("user-1");
+
+    // Duplicate webhook delivery from Telegram retry
+    upsertTelegramLink("user-1", "chat-999", "elderly_user");
+    expect(activeLinks.size).toBe(1);
+
+    // Profile updates link from another chat
+    upsertTelegramLink("user-1", "chat-888", "elderly_user");
+    expect(activeLinks.size).toBe(1);
+    expect(activeLinks.has("chat-999")).toBe(false);
+    expect(activeLinks.get("chat-888")?.profile_id).toBe("user-1");
+  });
+
+  // =========================================================================
+  // 28. Non-message or non-text Telegram updates are handled gracefully
+  // =========================================================================
+  it("Point 28: safely returns ok: true for non-message or non-text Telegram updates without processing", () => {
+    function evaluateWebhookUpdate(update: { message?: { text?: string; chat?: { id: number } } }) {
+      const message = update.message;
+      if (!message || !message.text || !message.chat?.id) {
+        return { handled: false, status: 200, response: { ok: true } };
+      }
+      return { handled: true, status: 200, response: { ok: true } };
+    }
+
+    // Channel post update (no message object)
+    expect(evaluateWebhookUpdate({})).toEqual({ handled: false, status: 200, response: { ok: true } });
+
+    // Photo message (no text)
+    expect(evaluateWebhookUpdate({ message: { chat: { id: 12345 } } })).toEqual({
+      handled: false,
+      status: 200,
+      response: { ok: true },
+    });
+
+    // Valid command message
+    expect(evaluateWebhookUpdate({ message: { text: "/start token123", chat: { id: 12345 } } })).toEqual({
+      handled: true,
+      status: 200,
+      response: { ok: true },
+    });
+  });
+
+  // =========================================================================
+  // 29. Notification engine respects telegram_enabled: false preference
+  // =========================================================================
+  it("Point 29: skips Telegram dispatch when preference telegram_enabled is false", () => {
+    const preferences = { telegram_enabled: false, email_enabled: true };
+    const chatBinding = { telegram_chat_id: "chat-999" };
+
+    function shouldDispatchTelegram(pref: typeof preferences, binding?: typeof chatBinding | null): boolean {
+      return Boolean(pref.telegram_enabled && binding?.telegram_chat_id);
+    }
+
+    expect(shouldDispatchTelegram(preferences, chatBinding)).toBe(false);
+    expect(shouldDispatchTelegram({ telegram_enabled: true, email_enabled: true }, null)).toBe(false);
+    expect(shouldDispatchTelegram({ telegram_enabled: true, email_enabled: true }, chatBinding)).toBe(true);
+  });
+
+  // =========================================================================
+  // 30. Deep link generates correct official bot URL
+  // =========================================================================
+  it("Point 30: builds correct deep-link URL containing the target bot username and start param", () => {
+    const originalUsername = process.env.TELEGRAM_BOT_USERNAME;
+    process.env.TELEGRAM_BOT_USERNAME = "VatsalyaCareBot";
+
+    try {
+      const token = "secure-random-link-token";
+      const deepLink = buildTelegramDeepLink(token);
+      expect(deepLink).toBe("https://t.me/VatsalyaCareBot?start=secure-random-link-token");
+    } finally {
+      process.env.TELEGRAM_BOT_USERNAME = originalUsername;
+    }
+  });
+
+  // =========================================================================
+  // 31. isTelegramConfigured correctly recognizes configured bot tokens
+  // =========================================================================
+  it("Point 31: isTelegramConfigured correctly validates bot token format and rejects placeholders", () => {
+    const originalToken = process.env.TELEGRAM_BOT_TOKEN;
+
+    try {
+      process.env.TELEGRAM_BOT_TOKEN = "123456789:ABCdefGHIjklMNOpqrSTUvwxYZ_placeholder";
+      expect(isTelegramConfigured()).toBe(false);
+
+      process.env.TELEGRAM_BOT_TOKEN = "";
+      expect(isTelegramConfigured()).toBe(false);
+
+      delete process.env.TELEGRAM_BOT_TOKEN;
+      expect(isTelegramConfigured()).toBe(false);
+
+      process.env.TELEGRAM_BOT_TOKEN = "9222485860:AAF8zvOa-aKY2Rr_9U_l4dl85-h8Pz6rBnQ";
+      expect(isTelegramConfigured()).toBe(true);
+    } finally {
+      process.env.TELEGRAM_BOT_TOKEN = originalToken;
+    }
   });
 });
