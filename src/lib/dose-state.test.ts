@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateDoseState } from "./dose-state";
+import { evaluateDoseState, generateDoseOccurrenceKey } from "./dose-state";
 
 describe("evaluateDoseState", () => {
   const targetDateStr = "2026-11-15";
@@ -56,5 +56,28 @@ describe("evaluateDoseState", () => {
       existingStatus: null,
     });
     expect(status).toBe("UNCONFIRMED");
+  });
+});
+
+describe("Dose Occurrence Key & Multi-Dose per Day Handling", () => {
+  const scheduleId = "550e8400-e29b-41d4-a716-446655440000";
+
+  it("generates distinct occurrence keys for multiple doses on the same day", () => {
+    const morningDose = new Date("2026-11-15T08:30:00.000Z");
+    const eveningDose = new Date("2026-11-15T20:30:00.000Z");
+
+    const morningKey = generateDoseOccurrenceKey(scheduleId, morningDose);
+    const eveningKey = generateDoseOccurrenceKey(scheduleId, eveningDose);
+
+    expect(morningKey).not.toBe(eveningKey);
+    expect(morningKey).toContain("2026-11-15T08:30:00.000Z");
+    expect(eveningKey).toContain("2026-11-15T20:30:00.000Z");
+  });
+
+  it("produces identical occurrence keys for the same scheduled occurrence (Idempotency)", () => {
+    const doseTime = new Date("2026-11-15T08:30:00.000Z");
+    const key1 = generateDoseOccurrenceKey(scheduleId, doseTime);
+    const key2 = generateDoseOccurrenceKey(scheduleId, doseTime);
+    expect(key1).toBe(key2);
   });
 });

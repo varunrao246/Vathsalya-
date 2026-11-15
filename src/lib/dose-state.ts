@@ -17,6 +17,14 @@ export interface EvaluateDoseStateParams {
 }
 
 /**
+ * Generates an occurrence key for a dose.
+ * Critical Fix: Replaces UNIQUE(schedule_id, scheduled_date) to allow multiple doses per day.
+ */
+export function generateDoseOccurrenceKey(scheduleId: string, scheduledAt: Date): string {
+  return `${scheduleId}_${scheduledAt.toISOString()}`;
+}
+
+/**
  * Deterministic dose state evaluator.
  * Alternative execution outcomes: TAKEN and OVERDUE are distinct branches from DUE.
  */
