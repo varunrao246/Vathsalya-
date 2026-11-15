@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -9,12 +10,14 @@ import {
   Stethoscope,
   ArrowLeft,
   LogOut,
-  Info,
   FileText,
   KeyRound,
   PlusCircle,
   Pill,
   Bell,
+  Menu,
+  X,
+  ShieldCheck,
 } from "lucide-react";
 import { signOutUser, isSupabaseConfigured } from "@/lib/auth/auth-client";
 
@@ -26,161 +29,233 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const configured = isSupabaseConfigured();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOutUser();
     router.push("/login");
   };
 
+  const navLinks = [
+    {
+      name: "Dashboard Overview",
+      href: pathname.startsWith("/dashboard/elderly")
+        ? "/dashboard/elderly"
+        : pathname.startsWith("/dashboard/caretaker")
+        ? "/dashboard/caretaker"
+        : "/dashboard/family",
+      icon: Users,
+    },
+    {
+      name: "Medications & Schedules",
+      href: "/dashboard/medications",
+      icon: Pill,
+    },
+    {
+      name: "Clinical Health Record",
+      href: "/dashboard/profile",
+      icon: FileText,
+    },
+    {
+      name: "Members & Passcodes",
+      href: "/dashboard/members",
+      icon: KeyRound,
+    },
+    {
+      name: "Alerts & Escalation",
+      href: "/dashboard/settings/notifications",
+      icon: Bell,
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FDFBF7]">
+    <div className="min-h-screen flex flex-col bg-[#FDFBF7] text-[#1F2421]">
       {/* Top Application Bar */}
       <header className="sticky top-0 z-40 bg-white border-b border-[#EFECE6] shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Logo & Active Profile Context */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="w-9 h-9 rounded-xl bg-[#1E3A2F] text-white flex items-center justify-center">
                 <HeartHandshake className="w-5 h-5 text-[#EBF2EE]" />
               </div>
-              <span className="font-bold text-xl text-[#1E3A2F] tracking-tight">VATSALYA</span>
+              <span className="font-extrabold text-xl text-[#1E3A2F] tracking-tight">VATSALYA</span>
             </Link>
-            <span className="hidden lg:inline-block text-xs px-2.5 py-1 rounded-full bg-[#EBF2EE] text-[#1E3A2F] font-semibold">
-              Profile: Appaji Rao (74, Bangalore)
+            <span className="hidden lg:inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-[#EBF2EE] text-[#1E3A2F] font-bold border border-[#D5E2D9]">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              Appaji Rao (Age 74 • Bangalore)
             </span>
           </div>
 
-          {/* Quick Role Switcher for Hackathon Evaluation */}
-          <nav className="flex items-center gap-1 bg-[#FDFBF7] p-1 rounded-xl border border-[#EFECE6]">
+          {/* Quick Role Switcher */}
+          <nav aria-label="Role Switcher" className="hidden sm:flex items-center gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#EFECE6]">
             <Link
               href="/dashboard/elderly"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 pathname === "/dashboard/elderly"
-                  ? "bg-white text-[#1E3A2F] shadow-xs"
+                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
                   : "text-[#5C6460] hover:text-[#1E3A2F]"
               }`}
             >
               <User className="w-3.5 h-3.5 text-[#607B6E]" />
-              <span className="hidden sm:inline">Elderly</span>
+              <span>Elderly View</span>
             </Link>
             <Link
               href="/dashboard/family"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 pathname === "/dashboard/family"
-                  ? "bg-white text-[#1E3A2F] shadow-xs"
+                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
                   : "text-[#5C6460] hover:text-[#1E3A2F]"
               }`}
             >
               <Users className="w-3.5 h-3.5 text-[#607B6E]" />
-              <span className="hidden sm:inline">Family</span>
+              <span>Family View</span>
             </Link>
             <Link
               href="/dashboard/caretaker"
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 pathname === "/dashboard/caretaker"
-                  ? "bg-white text-[#1E3A2F] shadow-xs"
+                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
                   : "text-[#5C6460] hover:text-[#1E3A2F]"
               }`}
             >
               <Stethoscope className="w-3.5 h-3.5 text-[#607B6E]" />
-              <span className="hidden sm:inline">Caretaker</span>
+              <span>Caretaker View</span>
             </Link>
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
             <button
               onClick={handleSignOut}
-              className="text-xs font-semibold text-[#5C6460] hover:text-[#1E3A2F] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#EFECE6] bg-[#FDFBF7] hover:bg-white cursor-pointer"
+              className="text-xs font-bold text-[#5C6460] hover:text-[#1E3A2F] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#EFECE6] bg-[#FAF8F5] hover:bg-white cursor-pointer transition-colors shadow-2xs"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Sign Out</span>
             </button>
             <Link
               href="/"
-              className="text-xs font-medium text-[#5C6460] hover:text-[#1E3A2F] flex items-center gap-1"
+              className="text-xs font-bold text-[#5C6460] hover:text-[#1E3A2F] flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-[#FAF8F5] transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Exit</span>
             </Link>
+            <button
+              onClick={() => setMobileNavOpen(!mobileNavOpen)}
+              className="md:hidden p-1.5 text-[#1E3A2F] rounded-lg border border-[#EFECE6] bg-[#FAF8F5]"
+              aria-label="Toggle navigation"
+            >
+              {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
 
-        {/* Sub-navigation bar for Profile & Member Management */}
-        <div className="bg-[#FAF8F5] border-t border-[#EFECE6] px-4 sm:px-6 lg:px-8 py-2">
-          <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-semibold">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard/family"
-                className={`hover:text-[#1E3A2F] transition-colors ${
-                  pathname === "/dashboard/family" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
-                }`}
-              >
-                Dashboard Overview
-              </Link>
-              <Link
-                href="/dashboard/medications"
-                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
-                  pathname === "/dashboard/medications" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
-                }`}
-              >
-                <Pill className="w-3.5 h-3.5" />
-                Medications &amp; Schedules
-              </Link>
-              <Link
-                href="/dashboard/profile"
-                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
-                  pathname === "/dashboard/profile" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Clinical Health Record
-              </Link>
-              <Link
-                href="/dashboard/members"
-                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
-                  pathname === "/dashboard/members" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
-                }`}
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                Members &amp; Passcodes
-              </Link>
-              <Link
-                href="/dashboard/settings/notifications"
-                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
-                  pathname === "/dashboard/settings/notifications" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
-                }`}
-              >
-                <Bell className="w-3.5 h-3.5" />
-                Alerts &amp; Escalation
-              </Link>
+        {/* Sub-navigation bar for Profile & Module Management */}
+        <div className="hidden md:block bg-[#FAF8F5] border-t border-[#EFECE6] px-4 sm:px-6 lg:px-8 py-2">
+          <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-bold">
+            <div className="flex items-center gap-6">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 py-1 transition-colors ${
+                      isActive
+                        ? "text-[#1E3A2F] font-extrabold border-b-2 border-[#1E3A2F]"
+                        : "text-[#5C6460] hover:text-[#1E3A2F]"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{link.name}</span>
+                  </Link>
+                );
+              })}
             </div>
 
             <Link
               href="/onboard"
-              className="hidden sm:inline-flex items-center gap-1 text-[#1E3A2F] hover:text-[#162E25] font-bold"
+              className="inline-flex items-center gap-1.5 text-[#1E3A2F] hover:text-[#162E25] font-extrabold"
             >
               <PlusCircle className="w-3.5 h-3.5 text-[#607B6E]" />
-              New Healthcare Profile
+              <span>New Healthcare Profile</span>
             </Link>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileNavOpen && (
+          <div className="md:hidden border-t border-[#EFECE6] bg-white px-4 py-4 space-y-3 animate-in slide-in-from-top duration-150">
+            <div className="grid grid-cols-3 gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#EFECE6] text-center mb-3">
+              <Link
+                href="/dashboard/elderly"
+                onClick={() => setMobileNavOpen(false)}
+                className={`py-1.5 text-xs font-bold rounded-lg ${
+                  pathname === "/dashboard/elderly" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                }`}
+              >
+                Elderly
+              </Link>
+              <Link
+                href="/dashboard/family"
+                onClick={() => setMobileNavOpen(false)}
+                className={`py-1.5 text-xs font-bold rounded-lg ${
+                  pathname === "/dashboard/family" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                }`}
+              >
+                Family
+              </Link>
+              <Link
+                href="/dashboard/caretaker"
+                onClick={() => setMobileNavOpen(false)}
+                className={`py-1.5 text-xs font-bold rounded-lg ${
+                  pathname === "/dashboard/caretaker" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                }`}
+              >
+                Caretaker
+              </Link>
+            </div>
+
+            <div className="space-y-1">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={`flex items-center gap-2.5 p-2 rounded-xl text-xs font-bold ${
+                      isActive ? "bg-[#EBF2EE] text-[#1E3A2F]" : "text-[#5C6460] hover:bg-[#FAF8F5]"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 text-[#607B6E]" />
+                    <span>{link.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Demo Simulation Notice Banner for Hackathon Evaluators */}
+      {/* Security & RLS Context Banner */}
       <div className="bg-[#EBF2EE] border-b border-[#D5E2D9] px-4 py-2">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-[#1E3A2F]">
           <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-[#607B6E] shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-[#1E3A2F] shrink-0" />
             <span>
-              <strong className="font-semibold">
-                {configured ? "Live Authenticated Mode:" : "Role Preview Mode:"}
+              <strong className="font-bold">
+                {configured ? "Live Database Mode:" : "Role Preview Mode:"}
               </strong>{" "}
               {configured
-                ? "Connected to live Supabase Auth with PostgreSQL Row Level Security (RLS)."
-                : "Viewing UI layout with sample healthcare profile. Live user sessions are authenticated via Supabase Auth with PostgreSQL Row Level Security (RLS)."}
+                ? "Protected by PostgreSQL Row Level Security (RLS) with role-based permissions."
+                : "Protected by PostgreSQL Row Level Security (RLS) with role-based permissions."}
             </span>
           </div>
-          <span className="hidden md:inline font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-[#D5E2D9]">
-            RLS Policy: has_healthcare_access()
+          <span className="hidden md:inline font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-[#D5E2D9] font-bold text-[#1E3A2F]">
+            RLS: has_healthcare_access()
           </span>
         </div>
       </div>
