@@ -52,11 +52,11 @@ export async function GET(req: Request) {
   // Fetch healthcare profile time zone
   const { data: hp } = await supabase
     .from("healthcare_profiles")
-    .select("time_zone")
+    .select("timezone")
     .eq("id", healthcareProfileId)
     .maybeSingle();
 
-  const timeZone = hp?.time_zone || "Asia/Kolkata";
+  const timeZone = (hp as unknown as { timezone?: string })?.timezone || "Asia/Kolkata";
 
   // 1. Fetch medications for profile (including historical medications active on target date)
   const { data: medications, error: medsError } = await supabase

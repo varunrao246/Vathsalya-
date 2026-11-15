@@ -61,7 +61,7 @@ export class EscalationEngine {
     // 1. Fetch eligible healthcare profiles
     let profilesQuery = supabase
       .from("healthcare_profiles")
-      .select("id, display_name, time_zone, primary_elder_id");
+      .select("id, display_name, timezone, primary_elder_id");
 
     if (options.profileIdFilter) {
       profilesQuery = profilesQuery.eq("id", options.profileIdFilter);
@@ -81,7 +81,7 @@ export class EscalationEngine {
 
     // 2. Iterate each healthcare profile in its own timezone
     for (const hp of healthcareProfiles) {
-      const timeZone = hp.time_zone || "Asia/Kolkata";
+      const timeZone = (hp as unknown as { timezone?: string }).timezone || "Asia/Kolkata";
 
       // A. Fetch active members & their notification links/preferences
       const { data: members } = await supabase
