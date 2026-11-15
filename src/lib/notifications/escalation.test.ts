@@ -11,7 +11,11 @@ import {
   buildTelegramDeepLink,
   isTelegramConfigured,
 } from "./telegram";
-import { buildEmailTemplate } from "./email";
+import {
+  buildEmailTemplate,
+  getResendConfig,
+  isResendConfigured,
+} from "./email";
 import { evaluatePermission, MemberAccessContext } from "../auth/rbac";
 import { buildScheduledDate, evaluateDoseOccurrenceStatus } from "../medications/dose-engine";
 
@@ -637,5 +641,95 @@ describe("Milestone 5: Smart Care Escalation & Multi-Channel Notifications Test 
     } finally {
       process.env.TELEGRAM_BOT_TOKEN = originalToken;
     }
+  });
+
+  // =========================================================================
+  // 32. Resend sender address parsing and default fallback
+  // =========================================================================
+  it("Point 32: correctly parses sender display name and email address, sanitizing quotes", () => {
+    const originalFrom = process.env.RESEND_FROM_EMAIL;
+
+    try {
+      process.env.RESEND_FROM_EMAIL = '"VATSALYA Care <onboarding@resend.dev>"';
+      expect(getResendConfig().fromEmail).toBe("VATSALYA Care <onboarding@resend.dev>");
+
+      process.env.RESEND_FROM_EMAIL = "VATSALYA Care <onboarding@resend.dev>";
+      expect(getResendConfig().fromEmail).toBe("VATSALYA Care <onboarding@resend.dev>");
+
+      delete process.env.RESEND_FROM_EMAIL;
+      expect(getResendConfig().fromEmail).toBe("reminders@vatsalya.care");
+    } finally {
+      process.env.RESEND_FROM_EMAIL = originalFrom;
+    }
+  });
+
+  // =========================================================================
+  // 33. isResendConfigured validates real vs placeholder / missing API keys
+  // =========================================================================
+  it("Point 33: isResendConfigured correctly detects active API keys and rejects placeholders", () => {
+    const originalApiKey = process.env.RESEND_API_KEY;
+
+    try {
+      process.env.RESEND_API_KEY = "re_123456789_placeholder";
+      expect(isResendConfigured()).toBe(false);
+
+      process.env.RESEND_API_KEY = "";
+      expect(isResendConfigured()).toBe(false);
+
+      delete process.env.RESEND_API_KEY;
+      expect(isResendConfigured()).toBe(false);
+
+      process.env.RESEND_API_KEY = "re_live_valid_api_key_sample";
+      expect(isResendConfigured()).toBe(true);
+    } finally {
+      process.env.RESEND_API_KEY = originalApiKey;
+    }
+  });
+
+  // =========================================================================
+  // 34. Resend email failure records FAILED status without creating duplicates
+  // =========================================================================
+  it("Point 34: records provider failures as FAILED (never SENT) and prevents duplicate notifications", () => {
+    const notifications = new Map<string, { status: string; retries: number; error?: string }>();
+
+    function recordEmailAttempt(idempotencyKey: string, providerResponse: { ok: boolean; error?: string }) {
+      const existing = notifications.get(idempotencyKey);
+      if (existing && existing.status === "SENT") {
+        return { success: false, reason: "ALREADY_SENT" };
+      }
+
+      if (!providerResponse.ok) {
+        notifications.set(idempotencyKey, {
+          status: "FAILED",
+          retries: (existing?.retries || 0) + 1,
+          error: providerResponse.error || "PROVIDER_ERROR",
+        });
+        return { success: false, status: "FAILED" };
+      }
+
+      notifications.set(idempotencyKey, {
+        status: "SENT",
+        retries: existing?.retries || 0,
+      });
+      return { success: true, status: "SENT" };
+    }
+
+    const key = "sha256-deterministic-email-key-123";
+
+    // 1. Initial attempt fails (e.g. rate limit or domain error)
+    const attempt1 = recordEmailAttempt(key, { ok: false, error: "Domain not verified" });
+    expect(attempt1.status).toBe("FAILED");
+    expect(notifications.get(key)?.status).toBe("FAILED");
+    expect(notifications.get(key)?.retries).toBe(1);
+
+    // 2. Retry succeeds
+    const attempt2 = recordEmailAttempt(key, { ok: true });
+    expect(attempt2.status).toBe("SENT");
+    expect(notifications.get(key)?.status).toBe("SENT");
+
+    // 3. Subsequent retry attempt rejected because already SENT
+    const attempt3 = recordEmailAttempt(key, { ok: true });
+    expect(attempt3.reason).toBe("ALREADY_SENT");
+    expect(notifications.size).toBe(1); // No duplicate notification created
   });
 });

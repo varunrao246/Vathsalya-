@@ -6,9 +6,16 @@ export interface ResendConfig {
 }
 
 export function getResendConfig(): ResendConfig {
+  let fromEmail = process.env.RESEND_FROM_EMAIL || "reminders@vatsalya.care";
+  if (
+    (fromEmail.startsWith('"') && fromEmail.endsWith('"')) ||
+    (fromEmail.startsWith("'") && fromEmail.endsWith("'"))
+  ) {
+    fromEmail = fromEmail.slice(1, -1);
+  }
   return {
     apiKey: process.env.RESEND_API_KEY,
-    fromEmail: process.env.RESEND_FROM_EMAIL || "reminders@vatsalya.care",
+    fromEmail,
   };
 }
 
@@ -16,6 +23,7 @@ export function isResendConfigured(): boolean {
   const { apiKey } = getResendConfig();
   return Boolean(
     apiKey &&
+      apiKey !== "undefined" &&
       !apiKey.includes("placeholder") &&
       !apiKey.startsWith("re_123456789")
   );
