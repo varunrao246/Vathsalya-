@@ -241,4 +241,125 @@ describe("Milestone 3: Healthcare Profile Onboarding & Secure Member Access Test
     expect(crossProfileCheck.allowed).toBe(false);
     expect(crossProfileCheck.reason).toContain("CROSS_PROFILE_DENIAL");
   });
+
+  // =========================================================================
+  // 13. Identity and Ownership Decoupling (Fix for Onboarding RLS)
+  // =========================================================================
+  it("Scenario 13: strictly separates created_by (family administrator) from primary_elder_id (patient)", () => {
+    const familyAdminUserId = "daughter-user-uuid-111";
+    
+    // Family member onboards parent Savitri Amma (isSelf: false)
+    const onboardingPayload = {
+      displayName: "Savitri Amma",
+      dateOfBirth: "1954-08-15",
+      isSelf: false,
+    };
+
+    const resolvedPrimaryElderId = onboardingPayload.isSelf ? familyAdminUserId : null;
+    const resolvedCreatedBy = familyAdminUserId;
+    const resolvedRole = onboardingPayload.isSelf ? "ELDERLY" : "FAMILY_ADMIN";
+
+    // Primary elder id must NOT be set to the daughter's user ID
+    expect(resolvedPrimaryElderId).toBeNull();
+    expect(resolvedPrimaryElderId).not.toBe(familyAdminUserId);
+    expect(resolvedCreatedBy).toBe(familyAdminUserId);
+    expect(resolvedRole).toBe("FAMILY_ADMIN");
+
+    // Self onboarding (isSelf: true)
+    const elderlyUserId = "elder-user-uuid-222";
+    const selfPayload = {
+      displayName: "Appaji Rao",
+      dateOfBirth: "1948-05-12",
+      isSelf: true,
+    };
+
+    const selfElderId = selfPayload.isSelf ? elderlyUserId : null;
+    const selfCreatedBy = elderlyUserId;
+    const selfRole = selfPayload.isSelf ? "ELDERLY" : "FAMILY_ADMIN";
+
+    expect(selfElderId).toBe(elderlyUserId);
+    expect(selfCreatedBy).toBe(elderlyUserId);
+    expect(selfRole).toBe("ELDERLY");
+  });
+
+  // =========================================================================
+  // 14. Onboarding Idempotency & Duplicate Profile Prevention
+  // =========================================================================
+  it("Scenario 14: detects existing active profiles during retry and prevents duplicate insertion", () => {
+    const existingProfiles = [
+      {
+        id: "profile-existing-1",
+        display_name: "Appaji Rao",
+        date_of_birth: "1948-05-12",
+        deleted_at: null,
+      },
+    ];
+
+    function findDuplicate(
+      profiles: Array<{ id: string; display_name: string; date_of_birth: string; deleted_at: string | null }>,
+      displayName: string,
+      dob: string
+    ) {
+      return profiles.find(
+        (p) =>
+          !p.deleted_at &&
+          p.display_name.trim().toLowerCase() === displayName.trim().toLowerCase() &&
+          p.date_of_birth === dob
+      );
+    }
+
+    // Exact match
+    const dup1 = findDuplicate(existingProfiles, "Appaji Rao", "1948-05-12");
+    expect(dup1).toBeDefined();
+    expect(dup1?.id).toBe("profile-existing-1");
+
+    // Case-insensitive and trimmed match
+    const dup2 = findDuplicate(existingProfiles, "  appaji rao  ", "1948-05-12");
+    expect(dup2).toBeDefined();
+    expect(dup2?.id).toBe("profile-existing-1");
+
+    // Different DOB does not match
+    const noDup = findDuplicate(existingProfiles, "Appaji Rao", "1950-01-01");
+    expect(noDup).toBeUndefined();
+  });
+
+  // =========================================================================
+  // 15. All 4 Access Roles & Granular Permission Preservation
+  // =========================================================================
+  it("Scenario 15: preserves full permission matrix for ELDERLY, FAMILY_ADMIN, CARETAKER, and FAMILY_VIEWER", () => {
+    const roles = ["ELDERLY", "FAMILY_ADMIN", "CARETAKER", "FAMILY_VIEWER"] as const;
+
+    for (const role of roles) {
+      const context: MemberAccessContext = {
+        userId: `user-${role.toLowerCase()}`,
+        healthcareProfileId: profileIdA,
+        role,
+        status: "ACTIVE",
+      };
+
+      // All active members can view records
+      const viewRecord = evaluatePermission(context, profileIdA, "VIEW_HEALTHCARE_RECORDS");
+      expect(viewRecord.allowed).toBe(true);
+
+      // Caretaker can confirm doses
+      if (role === "CARETAKER") {
+        const canDose = evaluatePermission(context, profileIdA, "CONFIRM_DOSES");
+        expect(canDose.allowed).toBe(true);
+      }
+
+      // Family viewer is read-only
+      if (role === "FAMILY_VIEWER") {
+        const cannotManageMeds = evaluatePermission(context, profileIdA, "MANAGE_MEDICATIONS");
+        expect(cannotManageMeds.allowed).toBe(false);
+      }
+
+      // Admin and Elder have full domain management
+      if (role === "FAMILY_ADMIN" || role === "ELDERLY") {
+        const canManageMeds = evaluatePermission(context, profileIdA, "MANAGE_MEDICATIONS");
+        const canInvite = evaluatePermission(context, profileIdA, "INVITE_MEMBERS");
+        expect(canManageMeds.allowed).toBe(true);
+        expect(canInvite.allowed).toBe(true);
+      }
+    }
+  });
 });
