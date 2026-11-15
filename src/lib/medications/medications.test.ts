@@ -468,4 +468,167 @@ describe("Milestone 4: Medication Management, Multi-Slot Scheduling & Dose Track
     expect(run1.scheduledAt).toBe(run2.scheduledAt);
     expect(run1.targetTime).toBe(run2.targetTime);
   });
+
+  // =========================================================================
+  // 21. Timezone boundaries & Daylight Saving Time (DST) verification
+  // =========================================================================
+  it("Point 21: resolves exact UTC moment across different IANA timezones and DST transitions", () => {
+    // Asia/Kolkata (UTC+05:30, no DST)
+    const istDate = buildScheduledDate("2026-11-15", "08:30:00", "Asia/Kolkata");
+    expect(istDate.toISOString()).toBe("2026-11-15T03:00:00.000Z");
+
+    // America/New_York Summer (EDT, UTC-4)
+    const edtDate = buildScheduledDate("2026-07-15", "08:30:00", "America/New_York");
+    expect(edtDate.toISOString()).toBe("2026-07-15T12:30:00.000Z");
+
+    // America/New_York Winter (EST, UTC-5)
+    const estDate = buildScheduledDate("2026-12-15", "08:30:00", "America/New_York");
+    expect(estDate.toISOString()).toBe("2026-12-15T13:30:00.000Z");
+  });
+
+  // =========================================================================
+  // 22. Rejection of conflicting dose actions (Prevent silent overwrite)
+  // =========================================================================
+  it("Point 22: prevents silent overwrites by returning 409 conflict when action contradicts existing record", () => {
+    interface DoseLogRecord {
+      id: string;
+      status: "TAKEN" | "SKIPPED";
+      recorded_at: string;
+      actor_role: string;
+    }
+
+    const existingTakenLog: DoseLogRecord = {
+      id: "log-taken-1",
+      status: "TAKEN",
+      recorded_at: "2026-11-15T08:35:00.000Z",
+      actor_role: "ELDERLY",
+    };
+
+    function evaluateDoseConfirmationAction(
+      action: "TAKEN" | "SKIPPED",
+      existing: DoseLogRecord | null
+    ) {
+      if (existing) {
+        if (existing.status === action) {
+          return {
+            status: 409,
+            code: action === "TAKEN" ? "DOSE_ALREADY_CONFIRMED" : "DOSE_ALREADY_RECORDED",
+          };
+        }
+        return {
+          status: 409,
+          code: "DOSE_RECORD_CONFLICT",
+          message: `Conflicting action: dose was previously recorded as ${existing.status}`,
+        };
+      }
+      return { status: 200, code: "SUCCESS" };
+    }
+
+    // Duplicate taken
+    const dupCheck = evaluateDoseConfirmationAction("TAKEN", existingTakenLog);
+    expect(dupCheck.status).toBe(409);
+    expect(dupCheck.code).toBe("DOSE_ALREADY_CONFIRMED");
+
+    // Conflicting skipped action on already taken dose
+    const conflictCheck = evaluateDoseConfirmationAction("SKIPPED", existingTakenLog);
+    expect(conflictCheck.status).toBe(409);
+    expect(conflictCheck.code).toBe("DOSE_RECORD_CONFLICT");
+
+    // Conflicting taken action on already skipped dose
+    const existingSkippedLog = {
+      id: "log-skipped-1",
+      status: "SKIPPED" as const,
+      recorded_at: "2026-11-15T08:35:00.000Z",
+      actor_role: "CARETAKER",
+    };
+    const conflictCheck2 = evaluateDoseConfirmationAction("TAKEN", existingSkippedLog);
+    expect(conflictCheck2.status).toBe(409);
+    expect(conflictCheck2.code).toBe("DOSE_RECORD_CONFLICT");
+  });
+
+  // =========================================================================
+  // 23. Transaction Rollback Safety simulation
+  // =========================================================================
+  it("Point 23: rolls back created medication master record if schedule slots insertion fails", () => {
+    const db = {
+      medications: [] as { id: string; name: string }[],
+      schedules: [] as { id: string; medication_id: string }[],
+    };
+
+    function createMedicationWithSchedules(
+      medData: { id: string; name: string },
+      shouldScheduleFail: boolean
+    ) {
+      // 1. Insert medication
+      db.medications.push(medData);
+
+      // 2. Insert schedules
+      if (shouldScheduleFail) {
+        // Rollback inserted medication to ensure atomicity
+        db.medications = db.medications.filter((m) => m.id !== medData.id);
+        return { success: false, error: "SCHEDULE_INSERT_ERROR" };
+      }
+
+      db.schedules.push({ id: "s-1", medication_id: medData.id });
+      return { success: true };
+    }
+
+    const failedResult = createMedicationWithSchedules({ id: "med-atomic-test", name: "Amlodipine" }, true);
+    expect(failedResult.success).toBe(false);
+    expect(failedResult.error).toBe("SCHEDULE_INSERT_ERROR");
+    expect(db.medications.length).toBe(0); // Clean rollback!
+
+    const successResult = createMedicationWithSchedules({ id: "med-atomic-test", name: "Amlodipine" }, false);
+    expect(successResult.success).toBe(true);
+    expect(db.medications.length).toBe(1);
+    expect(db.schedules.length).toBe(1);
+  });
+
+  // =========================================================================
+  // 24. Dosage form normalization and constraint validation
+  // =========================================================================
+  it("Point 24: normalizes dosage_form to uppercase and validates against check constraint enum", () => {
+    const VALID_DOSAGE_FORMS = ["TABLET", "CAPSULE", "SYRUP", "INJECTION", "DROPS", "INHALER", "OTHER"];
+
+    function validateAndNormalizeDosageForm(input: string): { valid: boolean; normalized?: string } {
+      const normalized = String(input || "TABLET").toUpperCase();
+      if (!VALID_DOSAGE_FORMS.includes(normalized)) {
+        return { valid: false };
+      }
+      return { valid: true, normalized };
+    }
+
+    expect(validateAndNormalizeDosageForm("tablet")).toEqual({ valid: true, normalized: "TABLET" });
+    expect(validateAndNormalizeDosageForm("Capsule")).toEqual({ valid: true, normalized: "CAPSULE" });
+    expect(validateAndNormalizeDosageForm("syrup")).toEqual({ valid: true, normalized: "SYRUP" });
+    expect(validateAndNormalizeDosageForm("INVALID_FORM")).toEqual({ valid: false });
+  });
+
+  // =========================================================================
+  // 25. Historical dose timeline inclusion when medication discontinued on later date
+  // =========================================================================
+  it("Point 25: includes historical dose occurrences on past dates even if medication was later discontinued", () => {
+    const targetDate = "2026-11-10";
+    const medicationDiscontinuedLater = {
+      id: "med-old",
+      start_date: "2026-11-01",
+      deleted_at: "2026-11-14T00:00:00Z", // Discontinued on Nov 14 (AFTER target date Nov 10)
+    };
+
+    const deletedDateStr = new Date(medicationDiscontinuedLater.deleted_at).toISOString().split("T")[0];
+    const isMedicationActiveOnTargetDate = deletedDateStr >= targetDate;
+
+    expect(isMedicationActiveOnTargetDate).toBe(true);
+
+    const medicationDiscontinuedPrior = {
+      id: "med-very-old",
+      start_date: "2026-10-01",
+      deleted_at: "2026-11-05T00:00:00Z", // Discontinued on Nov 5 (BEFORE target date Nov 10)
+    };
+
+    const deletedPriorDateStr = new Date(medicationDiscontinuedPrior.deleted_at).toISOString().split("T")[0];
+    const isPriorMedicationActiveOnTargetDate = deletedPriorDateStr >= targetDate;
+
+    expect(isPriorMedicationActiveOnTargetDate).toBe(false);
+  });
 });

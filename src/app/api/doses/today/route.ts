@@ -49,7 +49,16 @@ export async function GET(req: Request) {
     );
   }
 
-  // 1. Fetch active medications for profile
+  // Fetch healthcare profile time zone
+  const { data: hp } = await supabase
+    .from("healthcare_profiles")
+    .select("time_zone")
+    .eq("id", healthcareProfileId)
+    .maybeSingle();
+
+  const timeZone = hp?.time_zone || "Asia/Kolkata";
+
+  // 1. Fetch medications for profile (including historical medications active on target date)
   const { data: medications, error: medsError } = await supabase
     .from("medications")
     .select(`
@@ -61,6 +70,7 @@ export async function GET(req: Request) {
       start_date,
       end_date,
       is_active,
+      deleted_at,
       schedules:medication_schedules (
         id,
         medication_id,
@@ -73,9 +83,7 @@ export async function GET(req: Request) {
         is_active
       )
     `)
-    .eq("healthcare_profile_id", healthcareProfileId)
-    .eq("is_active", true)
-    .is("deleted_at", null);
+    .eq("healthcare_profile_id", healthcareProfileId);
 
   if (medsError) {
     return NextResponse.json(
@@ -103,7 +111,24 @@ export async function GET(req: Request) {
 
   // 3. Evaluate each medication schedule
   for (const med of medications || []) {
+    // Discontinuation audit: If discontinued prior to target date, only include if dose logs exist for that date
+    if (med.deleted_at) {
+      const deletedDateStr = new Date(med.deleted_at).toISOString().split("T")[0];
+      if (deletedDateStr < targetDateStr) {
+        const hasLogsForMed = (doseLogs || []).some((l) =>
+          med.schedules?.some((s: { id: string }) => s.id === l.schedule_id)
+        );
+        if (!hasLogsForMed) continue;
+      }
+    }
+
     for (const sched of med.schedules || []) {
+      // If schedule was deactivated, only evaluate if an existing dose log was recorded on this date
+      const hasLogForSched = (doseLogs || []).some((log) => log.schedule_id === sched.id);
+      if (!sched.is_active && !hasLogForSched) {
+        continue;
+      }
+
       const applies = doesScheduleApplyOnDate(
         {
           id: sched.id,
@@ -114,16 +139,16 @@ export async function GET(req: Request) {
           frequency_type: sched.frequency_type,
           days_of_week: sched.days_of_week,
           reminder_minutes_before: sched.reminder_minutes_before,
-          is_active: sched.is_active,
+          is_active: true, // evaluated conditionally above
           start_date: med.start_date,
           end_date: med.end_date,
         },
         targetDateStr
       );
 
-      if (!applies) continue;
+      if (!applies && !hasLogForSched) continue;
 
-      const scheduledAt = buildScheduledDate(targetDateStr, sched.target_time);
+      const scheduledAt = buildScheduledDate(targetDateStr, sched.target_time, timeZone);
       const occurrenceKey = generateDoseOccurrenceKey(sched.id, scheduledAt);
 
       // Check if existing dose log exists for this occurrence

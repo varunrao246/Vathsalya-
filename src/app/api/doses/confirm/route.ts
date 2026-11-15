@@ -94,23 +94,47 @@ export async function POST(req: Request) {
     const occurrenceDate = new Date(scheduledAt);
     const occurrenceKey = generateDoseOccurrenceKey(scheduleId, occurrenceDate);
 
-    // 3. Idempotency Check: check if already confirmed
+    // 3. Idempotency & Conflict Check: prevent duplicate confirmations and silent overwrites
     const { data: existingLog } = await supabase
       .from("dose_logs")
       .select("id, status, recorded_at, actor_role, notes")
       .eq("scheduled_occurrence_key", occurrenceKey)
       .maybeSingle();
 
-    if (existingLog && existingLog.status === "TAKEN" && action === "TAKEN") {
+    if (existingLog) {
+      if (existingLog.status === action) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: action === "TAKEN" ? "DOSE_ALREADY_CONFIRMED" : "DOSE_ALREADY_RECORDED",
+              message: `This dose was already recorded as ${action} at ${new Date(
+                existingLog.recorded_at
+              ).toLocaleTimeString()} (${existingLog.actor_role}).`,
+              details: {
+                doseLogId: existingLog.id,
+                recordedAt: existingLog.recorded_at,
+                actorRole: existingLog.actor_role,
+                status: existingLog.status,
+              },
+            },
+          },
+          { status: 409 }
+        );
+      }
+
+      // Conflicting action: Attempting to overwrite an existing TAKEN or SKIPPED record
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "DOSE_ALREADY_CONFIRMED",
-            message: `This dose was already confirmed as taken at ${new Date(
+            code: "DOSE_RECORD_CONFLICT",
+            message: `Conflicting dose action: This dose was previously recorded as ${existingLog.status} by ${existingLog.actor_role} at ${new Date(
               existingLog.recorded_at
-            ).toLocaleTimeString()} (${existingLog.actor_role}).`,
+            ).toLocaleTimeString()} and cannot be silently overwritten.`,
             details: {
+              existingStatus: existingLog.status,
+              requestedAction: action,
               doseLogId: existingLog.id,
               recordedAt: existingLog.recorded_at,
               actorRole: existingLog.actor_role,

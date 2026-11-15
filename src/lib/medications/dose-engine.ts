@@ -182,14 +182,58 @@ export function evaluateDoseOccurrenceStatus({
 
 /**
  * Builds an exact Date object for a scheduled time on a target date.
- * Formats time string e.g. "08:30" or "08:30:00" on "2026-11-15".
+ * Accurately converts calendar time in the patient's timeZone (e.g. "Asia/Kolkata", "America/New_York")
+ * into a UTC Date object, respecting daylight-saving transitions and timezone boundaries.
  */
-export function buildScheduledDate(targetDateStr: string, targetTimeStr: string): Date {
+export function buildScheduledDate(
+  targetDateStr: string,
+  targetTimeStr: string,
+  timeZone?: string
+): Date {
   const [year, month, day] = targetDateStr.split("-").map(Number);
   const timeParts = targetTimeStr.split(":").map(Number);
   const hours = timeParts[0] || 0;
   const minutes = timeParts[1] || 0;
   const seconds = timeParts[2] || 0;
 
-  return new Date(year, month - 1, day, hours, minutes, seconds);
+  if (!timeZone) {
+    return new Date(year, month - 1, day, hours, minutes, seconds);
+  }
+
+  try {
+    const naiveUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(naiveUtc);
+    const p: Record<string, string> = {};
+    for (const part of parts) {
+      p[part.type] = part.value;
+    }
+
+    const tzHours = parseInt(p.hour, 10) % 24;
+    const targetDateLocal = new Date(
+      Date.UTC(
+        parseInt(p.year, 10),
+        parseInt(p.month, 10) - 1,
+        parseInt(p.day, 10),
+        tzHours,
+        parseInt(p.minute, 10),
+        parseInt(p.second, 10)
+      )
+    );
+
+    const offsetDiffMs = targetDateLocal.getTime() - naiveUtc.getTime();
+    return new Date(naiveUtc.getTime() - offsetDiffMs);
+  } catch {
+    return new Date(year, month - 1, day, hours, minutes, seconds);
+  }
 }

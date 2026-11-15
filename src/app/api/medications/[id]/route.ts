@@ -120,7 +120,17 @@ export async function PATCH(
 
     if (body.name !== undefined) updatePayload.name = body.name.trim();
     if (body.dosageStrength !== undefined) updatePayload.dosage_strength = body.dosageStrength.trim();
-    if (body.dosageForm !== undefined) updatePayload.dosage_form = body.dosageForm;
+    if (body.dosageForm !== undefined) {
+      const VALID_DOSAGE_FORMS = ["TABLET", "CAPSULE", "SYRUP", "INJECTION", "DROPS", "INHALER", "OTHER"];
+      const normalizedForm = String(body.dosageForm).toUpperCase();
+      if (!VALID_DOSAGE_FORMS.includes(normalizedForm)) {
+        return NextResponse.json(
+          { success: false, error: { code: "VALIDATION_ERROR", message: `Invalid dosageForm: ${body.dosageForm}` } },
+          { status: 400 }
+        );
+      }
+      updatePayload.dosage_form = normalizedForm;
+    }
     if (body.instructions !== undefined) updatePayload.instructions = body.instructions?.trim() || null;
     if (body.prescribingDoctor !== undefined) updatePayload.prescribing_doctor = body.prescribingDoctor?.trim() || null;
     if (body.isActive !== undefined) updatePayload.is_active = Boolean(body.isActive);

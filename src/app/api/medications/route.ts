@@ -180,6 +180,22 @@ export async function POST(req: Request) {
       );
     }
 
+    // Validate and normalize dosage form to match database check constraint
+    const VALID_DOSAGE_FORMS = ["TABLET", "CAPSULE", "SYRUP", "INJECTION", "DROPS", "INHALER", "OTHER"];
+    const normalizedDosageForm = String(dosageForm || "TABLET").toUpperCase();
+    if (!VALID_DOSAGE_FORMS.includes(normalizedDosageForm)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid dosageForm: ${dosageForm}. Must be one of: ${VALID_DOSAGE_FORMS.join(", ")}`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     // 1. Insert medication master record
     const { data: newMed, error: medError } = await supabase
       .from("medications")
@@ -188,7 +204,7 @@ export async function POST(req: Request) {
         name: name.trim(),
         generic_name: genericName ? genericName.trim() : null,
         dosage_strength: dosageStrength.trim(),
-        dosage_form: dosageForm,
+        dosage_form: normalizedDosageForm,
         instructions: instructions ? instructions.trim() : null,
         prescribing_doctor: prescribingDoctor ? prescribingDoctor.trim() : null,
         start_date: startDate,
@@ -205,7 +221,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Insert schedule slots
+    // 2. Insert schedule slots with transaction rollback safety
     const scheduleRows = schedules.map((slot: ScheduleSlotInput) => ({
       medication_id: newMed.id,
       target_time: slot.targetTime || "08:30:00",
@@ -223,6 +239,9 @@ export async function POST(req: Request) {
       .select();
 
     if (schedError) {
+      // Transaction Rollback: Clean up inserted master record to prevent orphaned records
+      await supabase.from("medications").delete().eq("id", newMed.id);
+
       return NextResponse.json(
         { success: false, error: { code: "SCHEDULE_INSERT_ERROR", message: schedError.message } },
         { status: 500 }
