@@ -19,7 +19,7 @@ export function Navbar() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-[#EFECE6] transition-all">
+    <header className="sticky top-0 z-50 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E8E2D9] transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Identity */}
         <Link href="/" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E3A2F] rounded-xl p-1">
@@ -76,20 +76,20 @@ export function Navbar() {
         <div className="hidden sm:flex items-center gap-3">
           <Link
             href="/join"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#1E3A2F] bg-white border border-[#EFECE6] rounded-xl hover:border-[#607B6E] hover:bg-[#FAF8F5] transition-all shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#1C1917] bg-white border border-[#E8E2D9] rounded-xl hover:border-[#0F766E] hover:bg-[#FAF8F5] transition-all shadow-xs"
           >
-            <Shield className="w-4 h-4 text-[#607B6E]" />
+            <Shield className="w-4 h-4 text-[#0F766E]" />
             Passcode Join
           </Link>
           <Link
             href="/login"
-            className="px-4 py-2 text-sm font-semibold text-[#1E3A2F] hover:text-[#162E25] transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-[#1C1917] hover:text-[#0F766E] transition-colors"
           >
             Sign In
           </Link>
           <Link
             href="/register"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#1E3A2F] rounded-xl hover:bg-[#162E25] transition-all shadow-xs active:scale-95"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#0F766E] rounded-xl hover:bg-[#0D655E] transition-all shadow-xs active:scale-95"
           >
             <span>Get Started</span>
             <ArrowRight className="w-4 h-4" />
