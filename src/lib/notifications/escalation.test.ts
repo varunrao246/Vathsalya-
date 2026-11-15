@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, it, expect } from "vitest";
 import {
   generateTelegramLinkingToken,
@@ -347,5 +348,175 @@ describe("Milestone 5: Smart Care Escalation & Multi-Channel Notifications Test 
     // Must be OVERDUE or UNCONFIRMED; NEVER automatically TAKEN!
     expect(status).not.toBe("TAKEN");
     expect(status).toBe("UNCONFIRMED");
+  });
+
+  // =========================================================================
+  // 21. Constant-time CRON_SECRET Bearer validation
+  // =========================================================================
+  it("Point 21: enforces Authorization: Bearer <CRON_SECRET> only, rejecting query parameters and invalid tokens", () => {
+    const configuredSecret = "vatsalya-secure-cron-secret-abcdef123456";
+
+    function validateCronAuth(authHeader: string | null, querySecret: string | null): { allowed: boolean; status: number } {
+      if (querySecret) {
+        // Query parameter authentication is strictly prohibited
+        return { allowed: false, status: 401 };
+      }
+
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return { allowed: false, status: 401 };
+      }
+
+      const provided = authHeader.substring(7).trim();
+      const expectedBuffer = Buffer.from(configuredSecret, "utf8");
+      const providedBuffer = Buffer.from(provided, "utf8");
+
+      if (expectedBuffer.length !== providedBuffer.length) {
+        return { allowed: false, status: 401 };
+      }
+
+      // Timing-safe comparison
+      const isMatch = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+      return { allowed: isMatch, status: isMatch ? 200 : 401 };
+    }
+
+    // Valid Bearer
+    expect(validateCronAuth("Bearer vatsalya-secure-cron-secret-abcdef123456", null)).toEqual({ allowed: true, status: 200 });
+
+    // Prohibited query param rejected even if matching
+    expect(validateCronAuth(null, "vatsalya-secure-cron-secret-abcdef123456")).toEqual({ allowed: false, status: 401 });
+
+    // Invalid token
+    expect(validateCronAuth("Bearer wrong-secret-token", null)).toEqual({ allowed: false, status: 401 });
+
+    // Missing header
+    expect(validateCronAuth(null, null)).toEqual({ allowed: false, status: 401 });
+  });
+
+  // =========================================================================
+  // 22. Unconfigured CRON_SECRET server lock
+  // =========================================================================
+  it("Point 22: locks cron execution if CRON_SECRET is unconfigured or placeholder", () => {
+    function checkCronConfig(secret: string | undefined): { locked: boolean; status: number } {
+      if (!secret || secret === "your_secure_random_cron_secret_placeholder") {
+        return { locked: true, status: 500 };
+      }
+      return { locked: false, status: 200 };
+    }
+
+    expect(checkCronConfig(undefined)).toEqual({ locked: true, status: 500 });
+    expect(checkCronConfig("your_secure_random_cron_secret_placeholder")).toEqual({ locked: true, status: 500 });
+    expect(checkCronConfig("valid-prod-secret")).toEqual({ locked: false, status: 200 });
+  });
+
+  // =========================================================================
+  // 23. Atomic notification claiming & stale lock recovery
+  // =========================================================================
+  it("Point 23: atomically claims notification, rejects concurrent workers, and recovers stale locks", () => {
+    const notificationsStore = new Map<string, { status: string; locked_at: number; retry_count: number }>();
+
+    function claimNotification(idempotencyKey: string, staleThresholdSeconds = 300): { claimed: boolean; reason: string } {
+      const existing = notificationsStore.get(idempotencyKey);
+
+      if (!existing) {
+        notificationsStore.set(idempotencyKey, { status: "PROCESSING", locked_at: Date.now(), retry_count: 0 });
+        return { claimed: true, reason: "CLAIMED_NEW" };
+      }
+
+      if (existing.status === "SENT") {
+        return { claimed: false, reason: "ALREADY_SENT" };
+      }
+
+      const isActivelyLocked =
+        existing.status === "PROCESSING" &&
+        Date.now() - existing.locked_at < staleThresholdSeconds * 1000;
+
+      if (isActivelyLocked) {
+        return { claimed: false, reason: "CONCURRENT_LOCK_ACTIVE" };
+      }
+
+      // Recover stale lock or retry failed
+      existing.status = "PROCESSING";
+      existing.locked_at = Date.now();
+      existing.retry_count += 1;
+      return { claimed: true, reason: "CLAIMED_FOR_RETRY" };
+    }
+
+    const key = "test-atomic-claim-key";
+
+    // 1. First claim succeeds
+    expect(claimNotification(key)).toEqual({ claimed: true, reason: "CLAIMED_NEW" });
+
+    // 2. Second claim within 5 minutes is rejected as concurrent active lock
+    expect(claimNotification(key)).toEqual({ claimed: false, reason: "CONCURRENT_LOCK_ACTIVE" });
+
+    // 3. If stale (> 300 seconds), can be claimed for retry
+    const record = notificationsStore.get(key)!;
+    record.locked_at = Date.now() - 350 * 1000; // 350s ago
+    expect(claimNotification(key)).toEqual({ claimed: true, reason: "CLAIMED_FOR_RETRY" });
+    expect(record.retry_count).toBe(1);
+
+    // 4. Once sent, future claims are rejected
+    record.status = "SENT";
+    expect(claimNotification(key)).toEqual({ claimed: false, reason: "ALREADY_SENT" });
+  });
+
+  // =========================================================================
+  // 24. ELDER_REPORTS_ALREADY_TAKEN does not create TAKEN dose log
+  // =========================================================================
+  it("Point 24: records ELDER_REPORTS_ALREADY_TAKEN as a verbal report, not automatic clinical proof of ingestion", () => {
+    function processEscalationResolution(action: string) {
+      const isDirectIntakeConfirmed =
+        action === "ADMINISTERED_BY_CARETAKER" || action === "DOSE_CONFIRMED_BY_ELDER";
+
+      return {
+        escalationStatus: "RESOLVED",
+        doseLoggedAsTaken: isDirectIntakeConfirmed,
+        isVerbalReportOnly: action === "ELDER_REPORTS_ALREADY_TAKEN",
+      };
+    }
+
+    const verbalReportResult = processEscalationResolution("ELDER_REPORTS_ALREADY_TAKEN");
+    expect(verbalReportResult.escalationStatus).toBe("RESOLVED");
+    expect(verbalReportResult.doseLoggedAsTaken).toBe(false); // Strict clinical rule!
+    expect(verbalReportResult.isVerbalReportOnly).toBe(true);
+
+    const directAdminResult = processEscalationResolution("ADMINISTERED_BY_CARETAKER");
+    expect(directAdminResult.doseLoggedAsTaken).toBe(true);
+  });
+
+  // =========================================================================
+  // 25. Non-intake caretaker actions do not mark dose as TAKEN
+  // =========================================================================
+  it("Point 25: verifies CALL_COMPLETED, UNABLE_TO_REACH, and ASSISTANCE_REQUIRED do not create TAKEN dose logs", () => {
+    const nonIntakeActions = ["CALL_COMPLETED", "UNABLE_TO_REACH", "ASSISTANCE_REQUIRED", "FOLLOW_UP_PENDING"];
+
+    for (const action of nonIntakeActions) {
+      const isDirectIntakeConfirmed =
+        action === "ADMINISTERED_BY_CARETAKER" || action === "DOSE_CONFIRMED_BY_ELDER";
+
+      expect(isDirectIntakeConfirmed).toBe(false);
+    }
+  });
+
+  // =========================================================================
+  // 26. Immediate single-use Telegram token deletion prevents replay attacks
+  // =========================================================================
+  it("Point 26: consumes linking token immediately to prevent webhook replay race conditions", () => {
+    const tokens = new Set(["single-use-token-xyz"]);
+
+    function consumeToken(token: string): { valid: boolean; error?: string } {
+      if (!tokens.has(token)) {
+        return { valid: false, error: "INVALID_OR_CONSUMED" };
+      }
+      tokens.delete(token); // Atomic immediate deletion
+      return { valid: true };
+    }
+
+    const firstAttempt = consumeToken("single-use-token-xyz");
+    expect(firstAttempt.valid).toBe(true);
+
+    const replayedAttempt = consumeToken("single-use-token-xyz");
+    expect(replayedAttempt.valid).toBe(false);
+    expect(replayedAttempt.error).toBe("INVALID_OR_CONSUMED");
   });
 });

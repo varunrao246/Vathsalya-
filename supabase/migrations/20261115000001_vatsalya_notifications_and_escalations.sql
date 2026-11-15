@@ -82,3 +82,85 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN NULL;
 END $$;
+
+-- 5. FUNCTION: claim_notification_for_processing
+-- Atomic, database-level locking and claiming of notifications to prevent concurrent workers from sending duplicate alerts.
+CREATE OR REPLACE FUNCTION public.claim_notification_for_processing(
+    p_idempotency_key TEXT,
+    p_healthcare_profile_id UUID,
+    p_recipient_identifier TEXT,
+    p_delivery_channel TEXT,
+    p_notification_type TEXT,
+    p_title TEXT,
+    p_message TEXT,
+    p_stale_lock_seconds INTEGER DEFAULT 300
+) RETURNS TABLE (
+    claimed BOOLEAN,
+    notification_id UUID,
+    current_status TEXT,
+    reason TEXT
+) LANGUAGE plpgsql AS $$
+DECLARE
+    v_row public.notifications%ROWTYPE;
+BEGIN
+    -- 1. Try to insert new record with status PROCESSING atomically
+    INSERT INTO public.notifications (
+        idempotency_key,
+        healthcare_profile_id,
+        recipient_identifier,
+        delivery_channel,
+        notification_type,
+        title,
+        message,
+        status,
+        locked_at,
+        dispatched_at,
+        retry_count
+    ) VALUES (
+        p_idempotency_key,
+        p_healthcare_profile_id,
+        p_recipient_identifier,
+        p_delivery_channel,
+        p_notification_type,
+        p_title,
+        p_message,
+        'PROCESSING',
+        now(),
+        now(),
+        0
+    )
+    ON CONFLICT (idempotency_key) DO NOTHING
+    RETURNING * INTO v_row;
+
+    IF FOUND THEN
+        RETURN QUERY SELECT true, v_row.id, v_row.status, 'CLAIMED_NEW'::TEXT;
+        RETURN;
+    END IF;
+
+    -- 2. If row already exists, acquire exclusive row lock
+    SELECT * INTO v_row FROM public.notifications WHERE idempotency_key = p_idempotency_key FOR UPDATE;
+
+    -- Already successfully sent -> do not send again
+    IF v_row.status = 'SENT' THEN
+        RETURN QUERY SELECT false, v_row.id, v_row.status, 'ALREADY_SENT'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Actively locked by another worker within the stale threshold -> do not steal
+    IF v_row.status = 'PROCESSING' AND v_row.locked_at IS NOT NULL AND v_row.locked_at > (now() - (p_stale_lock_seconds || ' seconds')::interval) THEN
+        RETURN QUERY SELECT false, v_row.id, v_row.status, 'CONCURRENT_LOCK_ACTIVE'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Stale lock or previously failed -> claim for retry with incremented retry count
+    UPDATE public.notifications
+    SET status = 'PROCESSING',
+        locked_at = now(),
+        retry_count = v_row.retry_count + 1
+    WHERE id = v_row.id
+    RETURNING * INTO v_row;
+
+    RETURN QUERY SELECT true, v_row.id, v_row.status, 'CLAIMED_FOR_RETRY'::TEXT;
+    RETURN;
+END;
+$$;

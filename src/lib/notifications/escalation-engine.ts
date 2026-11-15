@@ -582,56 +582,79 @@ export class EscalationEngine {
     };
     dryRun?: boolean;
   }): Promise<{ success: boolean; error?: string }> {
-    // 1. Idempotency Check: check if already recorded
-    const { data: existing } = await supabase
-      .from("notifications")
-      .select("id, status, dispatched_at, locked_at")
-      .eq("idempotency_key", idempotencyKey)
-      .maybeSingle();
-
-    if (existing) {
-      if (existing.status === "SENT") {
-        return { success: false, error: "ALREADY_SENT" };
-      }
-      if (existing.status === "PROCESSING") {
-        // Locked within the last 5 minutes -> concurrent worker in flight
-        const lockedAt = existing.locked_at ? new Date(existing.locked_at).getTime() : 0;
-        if (Date.now() - lockedAt < 5 * 60 * 1000) {
-          return { success: false, error: "CONCURRENT_LOCK_ACTIVE" };
-        }
-      }
-    }
-
     if (dryRun) {
       return { success: true };
     }
 
-    // 2. Atomic Claim: Insert or update as PROCESSING
-    const { data: claimedRow, error: claimError } = await supabase
-      .from("notifications")
-      .upsert(
-        {
-          idempotency_key: idempotencyKey,
-          healthcare_profile_id: healthcareProfileId,
-          recipient_identifier: recipientIdentifier,
-          delivery_channel: deliveryChannel,
-          notification_type: notificationType,
-          title,
-          message,
-          status: "PROCESSING",
-          locked_at: new Date().toISOString(),
-          dispatched_at: new Date().toISOString(),
-        },
-        { onConflict: "idempotency_key" }
-      )
-      .select()
-      .single();
+    // 1. Atomic Database Claim via PostgreSQL RPC
+    let notificationId: string | null = null;
+    const { data: claimResult, error: rpcError } = await supabase.rpc(
+      "claim_notification_for_processing",
+      {
+        p_idempotency_key: idempotencyKey,
+        p_healthcare_profile_id: healthcareProfileId,
+        p_recipient_identifier: recipientIdentifier,
+        p_delivery_channel: deliveryChannel,
+        p_notification_type: notificationType,
+        p_title: title,
+        p_message: message,
+        p_stale_lock_seconds: 300,
+      }
+    );
 
-    if (claimError || !claimedRow) {
-      return { success: false, error: claimError?.message || "CLAIM_FAILED" };
+    if (!rpcError && claimResult && claimResult.length > 0) {
+      const claim = claimResult[0];
+      if (!claim.claimed) {
+        return { success: false, error: claim.reason || "NOT_CLAIMED" };
+      }
+      notificationId = claim.notification_id;
+    } else {
+      // Fallback application-level atomic check & claim
+      const { data: existing } = await supabase
+        .from("notifications")
+        .select("id, status, locked_at")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+
+      if (existing) {
+        if (existing.status === "SENT") {
+          return { success: false, error: "ALREADY_SENT" };
+        }
+        if (existing.status === "PROCESSING") {
+          const lockedAt = existing.locked_at ? new Date(existing.locked_at).getTime() : 0;
+          if (Date.now() - lockedAt < 5 * 60 * 1000) {
+            return { success: false, error: "CONCURRENT_LOCK_ACTIVE" };
+          }
+        }
+      }
+
+      const { data: claimedRow, error: claimError } = await supabase
+        .from("notifications")
+        .upsert(
+          {
+            idempotency_key: idempotencyKey,
+            healthcare_profile_id: healthcareProfileId,
+            recipient_identifier: recipientIdentifier,
+            delivery_channel: deliveryChannel,
+            notification_type: notificationType,
+            title,
+            message,
+            status: "PROCESSING",
+            locked_at: new Date().toISOString(),
+            dispatched_at: new Date().toISOString(),
+          },
+          { onConflict: "idempotency_key" }
+        )
+        .select()
+        .single();
+
+      if (claimError || !claimedRow) {
+        return { success: false, error: claimError?.message || "CLAIM_FAILED" };
+      }
+      notificationId = claimedRow.id;
     }
 
-    // 3. Channel Execution (isolated failure handling)
+    // 2. Channel Execution (isolated failure handling)
     let dispatchResult: DispatchResult;
 
     if (deliveryChannel === "TELEGRAM") {
@@ -644,7 +667,7 @@ export class EscalationEngine {
       }
     }
 
-    // 4. Update status based on provider response
+    // 3. Update status based on provider response
     if (dispatchResult.success) {
       await supabase
         .from("notifications")
@@ -654,7 +677,7 @@ export class EscalationEngine {
           error_message: null,
           locked_at: null,
         })
-        .eq("id", claimedRow.id);
+        .eq("id", notificationId);
 
       return { success: true };
     } else {
@@ -665,7 +688,7 @@ export class EscalationEngine {
           error_message: dispatchResult.error || "DISPATCH_FAILED",
           locked_at: null,
         })
-        .eq("id", claimedRow.id);
+        .eq("id", notificationId);
 
       return { success: false, error: dispatchResult.error };
     }

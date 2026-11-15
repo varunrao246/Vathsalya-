@@ -167,10 +167,15 @@ export async function POST(req: Request) {
       updatedEscalation = escData?.[0] || null;
     }
 
-    // 4. If action confirms intake (ADMINISTERED_BY_CARETAKER or DOSE_CONFIRMED_BY_ELDER),
-    // record dose intake into dose_logs
+    // 4. Clinical Intake Confirmation Guard:
+    // Strictly ONLY ADMINISTERED_BY_CARETAKER and DOSE_CONFIRMED_BY_ELDER record a TAKEN state.
+    // ELDER_REPORTS_ALREADY_TAKEN is recorded as an unverified verbal report, NOT automatic proof of ingestion!
+    // CALL_COMPLETED, UNABLE_TO_REACH, ASSISTANCE_REQUIRED, and FOLLOW_UP_PENDING NEVER mark as TAKEN.
+    const isDirectIntakeConfirmed =
+      action === "ADMINISTERED_BY_CARETAKER" || action === "DOSE_CONFIRMED_BY_ELDER";
+
     let recordedDoseLog = null;
-    if (isResolved && scheduleId && scheduleOccurrenceKey && scheduledAt && scheduledDate && scheduledTime) {
+    if (isDirectIntakeConfirmed && scheduleId && scheduleOccurrenceKey && scheduledAt && scheduledDate && scheduledTime) {
       const actorRole =
         action === "ADMINISTERED_BY_CARETAKER" ? "CARETAKER" : "ELDERLY";
 
@@ -210,6 +215,7 @@ export async function POST(req: Request) {
         status: escalationStatus,
         notes: notes ? String(notes).trim() : null,
         doseConfirmed: Boolean(recordedDoseLog),
+        isVerbalReportOnly: action === "ELDER_REPORTS_ALREADY_TAKEN",
         doseLogId: recordedDoseLog?.id || null,
       },
     });

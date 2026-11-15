@@ -76,7 +76,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true }, { status: 200 });
       }
 
-      // Bind Telegram chat_id to the user's profile
+      // Single-use guarantee: delete token immediately to prevent replay race conditions
+      await supabase.from("telegram_linking_tokens").delete().eq("token", token);
+
+      // Clean up any prior chat links for this profile
+      await supabase
+        .from("telegram_links")
+        .delete()
+        .eq("profile_id", tokenRecord.profile_id);
+
+      // Bind Telegram chat_id to the verified profile
       const { error: linkError } = await supabase
         .from("telegram_links")
         .upsert(
@@ -97,9 +106,6 @@ export async function POST(req: Request) {
         );
         return NextResponse.json({ ok: true }, { status: 200 });
       }
-
-      // Single-use: delete used token
-      await supabase.from("telegram_linking_tokens").delete().eq("token", token);
 
       // Send confirmation to user
       await sendTelegramMessage(
