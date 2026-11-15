@@ -210,35 +210,33 @@ export default function LoginPage() {
 
           {errorMessage && (
             <div
-              className={`mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 ${
-                errorMessage.toLowerCase().includes("quota") ||
+              className={`mb-5 p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 ${errorMessage.toLowerCase().includes("quota") ||
                 errorMessage.toLowerCase().includes("rate limit")
-                  ? "bg-amber-50 border border-amber-200 text-amber-900"
-                  : "bg-rose-50 border border-rose-200 text-rose-800"
-              }`}
+                ? "bg-amber-50 border border-amber-200 text-amber-900"
+                : "bg-rose-50 border border-rose-200 text-rose-800"
+                }`}
             >
               <AlertCircle
-                className={`w-4 h-4 shrink-0 mt-0.5 ${
-                  errorMessage.toLowerCase().includes("quota") ||
+                className={`w-4 h-4 shrink-0 mt-0.5 ${errorMessage.toLowerCase().includes("quota") ||
                   errorMessage.toLowerCase().includes("rate limit")
-                    ? "text-amber-700"
-                    : "text-rose-600"
-                }`}
+                  ? "text-amber-700"
+                  : "text-rose-600"
+                  }`}
               />
               <div className="leading-relaxed space-y-1.5 flex-1">
                 <span>{errorMessage}</span>
                 {(errorMessage.toLowerCase().includes("quota") ||
                   errorMessage.toLowerCase().includes("rate limit")) && (
-                  <p className="text-[11px] font-normal text-amber-800 mt-1">
-                    Supabase&apos;s free built-in email provider has a strict limit of 3–4 emails per hour. You can immediately evaluate all features using our{" "}
-                    <Link
-                      href="/dashboard/family"
-                      className="underline font-bold text-[#0F766E] hover:text-[#0D655E]"
-                    >
-                      Demo Sandbox
-                    </Link>.
-                  </p>
-                )}
+                    <p className="text-[11px] font-normal text-amber-800 mt-1">
+                      Supabase&apos;s free built-in email provider has a strict limit of 3–4 emails per hour. You can immediately evaluate all features using our{" "}
+                      <Link
+                        href="/dashboard/family"
+                        className="underline font-bold text-[#0F766E] hover:text-[#0D655E]"
+                      >
+                        Demo Sandbox
+                      </Link>.
+                    </p>
+                  )}
                 {showResend && (
                   <div className="mt-2.5 pt-2 border-t border-rose-200/60">
                     <button
@@ -252,8 +250,8 @@ export default function LoginPage() {
                         {resendCooldown > 0
                           ? `Resend available in ${resendCooldown}s`
                           : resending
-                          ? "Sending..."
-                          : "Resend Verification Email to this address"}
+                            ? "Sending..."
+                            : "Resend Verification Email to this address"}
                       </span>
                     </button>
                     {resendFeedback && (
@@ -342,7 +340,6 @@ export default function LoginPage() {
           {/* Quick Demo Access Box for Hackathon Reviewers */}
           <div className="mt-6 pt-5 border-t border-[#E8E2D9] text-center">
             <span className="text-[11px] font-bold text-[#57534E] uppercase tracking-wider block mb-2">
-              Hackathon Evaluation
             </span>
             <div className="p-3 rounded-2xl bg-[#F3EDE5] border border-[#E8E2D9] text-xs text-[#1C1917]">
               <div className="flex items-center justify-center gap-1.5 font-bold text-[#0F766E] mb-1">
