@@ -164,3 +164,43 @@ BEGIN
     RETURN;
 END;
 $$;
+
+-- Grant execution permission on atomic claiming function
+GRANT EXECUTE ON FUNCTION public.claim_notification_for_processing(TEXT, UUID, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER) TO authenticated, service_role;
+
+-- ==============================================================================
+-- 6. ROW LEVEL SECURITY (RLS) FOR NEW TABLES
+-- ==============================================================================
+
+-- 1. telegram_linking_tokens
+ALTER TABLE public.telegram_linking_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own linking tokens"
+ON public.telegram_linking_tokens FOR ALL
+USING (profile_id = auth.uid());
+
+-- 2. notification_preferences
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Members can view notification preferences"
+ON public.notification_preferences FOR SELECT
+USING (public.has_healthcare_access(healthcare_profile_id));
+
+CREATE POLICY "Users can manage own notification preferences"
+ON public.notification_preferences FOR ALL
+USING (profile_id = auth.uid() AND public.has_healthcare_access(healthcare_profile_id));
+
+-- 3. escalation_events
+ALTER TABLE public.escalation_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Members can view escalation events"
+ON public.escalation_events FOR SELECT
+USING (public.has_healthcare_access(healthcare_profile_id));
+
+CREATE POLICY "Authorized members can update escalation events"
+ON public.escalation_events FOR UPDATE
+USING (
+    public.has_healthcare_access(healthcare_profile_id) AND
+    public.has_healthcare_permission(healthcare_profile_id, 'CONFIRM_DOSES')
+);
+
+CREATE POLICY "Service and admins can insert escalation events"
+ON public.escalation_events FOR INSERT
+WITH CHECK (public.has_healthcare_access(healthcare_profile_id));
