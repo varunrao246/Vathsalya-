@@ -35,40 +35,43 @@ export function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Navigation: 3 Role Modes */}
-        <nav aria-label="Role Navigation" className="hidden lg:flex items-center gap-1.5 bg-[#EBF2EE] p-1.5 rounded-full border border-[#D5E2D9]">
+        {/* Desktop Navigation: Clearly Labeled Demo Sandbox for Hackathon Judges */}
+        <nav aria-label="Demo Role Navigation" className="hidden lg:flex items-center gap-1 bg-[#F3EDE5] p-1.5 rounded-full border border-[#E8E2D9]">
+          <span className="text-[10px] uppercase font-bold text-[#0F766E] px-2.5 tracking-wider">
+            Demo Sandbox:
+          </span>
           <Link
             href="/dashboard/elderly"
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/elderly"
-                ? "bg-white text-[#1E3A2F] shadow-xs"
-                : "text-[#1E3A2F] hover:bg-white/80"
+                ? "bg-white text-[#1C1917] shadow-xs"
+                : "text-[#57534E] hover:text-[#1C1917] hover:bg-white/80"
             }`}
           >
-            <User className="w-3.5 h-3.5 text-[#607B6E]" />
-            Elderly View
+            <User className="w-3.5 h-3.5 text-[#0F766E]" />
+            Elderly
           </Link>
           <Link
             href="/dashboard/family"
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/family"
-                ? "bg-white text-[#1E3A2F] shadow-xs"
-                : "text-[#1E3A2F] hover:bg-white/80"
+                ? "bg-white text-[#1C1917] shadow-xs"
+                : "text-[#57534E] hover:text-[#1C1917] hover:bg-white/80"
             }`}
           >
-            <Users className="w-3.5 h-3.5 text-[#607B6E]" />
-            Family View
+            <Users className="w-3.5 h-3.5 text-[#0F766E]" />
+            Family
           </Link>
           <Link
             href="/dashboard/caretaker"
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/caretaker"
-                ? "bg-white text-[#1E3A2F] shadow-xs"
-                : "text-[#1E3A2F] hover:bg-white/80"
+                ? "bg-white text-[#1C1917] shadow-xs"
+                : "text-[#57534E] hover:text-[#1C1917] hover:bg-white/80"
             }`}
           >
-            <Stethoscope className="w-3.5 h-3.5 text-[#607B6E]" />
-            Caretaker View
+            <Stethoscope className="w-3.5 h-3.5 text-[#0F766E]" />
+            Caretaker
           </Link>
         </nav>
 

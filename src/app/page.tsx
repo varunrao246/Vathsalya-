@@ -14,10 +14,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   HeartHandshake,
-  Pill,
-  ChevronRight,
   ShieldAlert,
   HelpCircle,
+  Clock,
+  Sparkles,
+  Info,
+  Check,
+  FileText,
+  Activity,
 } from "lucide-react";
 
 export default function Home() {
@@ -26,18 +30,11 @@ export default function Home() {
       <Navbar />
 
       {/* Hero Section: Two-Column Intergenerational Storytelling */}
-      <section className="relative pt-8 pb-16 md:pt-16 md:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+      <section className="relative pt-8 pb-16 md:pt-14 md:pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           {/* Left Column: Emotional Message & Actions */}
           <div className="lg:col-span-7 space-y-6 text-left">
-            {/* Cultural & Clinical Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F3EDE5] border border-[#E8E2D9] text-[#1C1917] text-xs sm:text-sm font-semibold">
-              <span className="w-2 h-2 rounded-full bg-[#0F766E] animate-pulse" />
-              <span className="font-serif font-bold text-[#0F766E]">वात्सल्य</span>
-              <span className="text-[#57534E]">• Care beyond generations</span>
-            </div>
-
-            {/* Main Headline */}
+            {/* Main Headline (Repeated branding badge removed as requested) */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#1C1917] leading-[1.12]">
               Care that connects <span className="text-[#0F766E]">generations.</span>
             </h1>
@@ -68,7 +65,7 @@ export default function Home() {
             </div>
 
             {/* Sub-CTA Trust Indicator */}
-            <div className="flex items-center gap-3 text-xs text-[#57534E] pt-1">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[#57534E] pt-1">
               <span className="inline-flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-[#0F766E]" />
                 Senior-first 64px touch targets
@@ -77,6 +74,11 @@ export default function Home() {
               <span className="inline-flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[#0F766E]" />
                 Automated multi-channel escalation
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Lock className="w-4 h-4 text-[#0F766E]" />
+                Passcode-governed family circles
               </span>
             </div>
           </div>
@@ -136,107 +138,355 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Live Role Demonstration Sandbox Grid */}
-        <div className="mt-14 p-6 sm:p-8 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs text-left">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#E8E2D9]">
-            <div>
-              <span className="text-xs font-bold text-[#0F766E] uppercase tracking-wider">
-                Interactive Evaluation Sandbox
-              </span>
-              <h2 className="text-lg sm:text-xl font-bold text-[#1C1917]">
-                Experience VATSALYA through three distinct healthcare perspectives:
-              </h2>
-            </div>
-            <span className="text-xs font-semibold text-[#57534E] bg-[#F3EDE5] px-3 py-1 rounded-full border border-[#E8E2D9] self-start sm:self-auto">
-              Same Healthcare Profile • Role-Specific Access
+      {/* SECTION 2: Role Cards — Informational, Not Navigational */}
+      <section className="py-16 bg-white border-y border-[#E8E2D9]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#0F766E] px-3.5 py-1 rounded-full bg-[#F3EDE5] border border-[#E8E2D9]">
+              Role-Based Healthcare Coordination
             </span>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-[#1C1917] tracking-tight">
+              One platform. Three roles. Connected care.
+            </h2>
+            <p className="mt-3 text-base text-[#57534E] leading-relaxed">
+              Every person has a role. Every role has the right level of access.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6">
-            {/* Role 1: Elderly Individual */}
-            <Link
-              href="/dashboard/elderly"
-              className="group p-5 rounded-2xl bg-[#FAF8F5] hover:bg-white border-2 border-transparent hover:border-[#0F766E] transition-all flex flex-col justify-between"
-            >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Informational Role Card 1: Elderly Individual */}
+            <div className="p-7 rounded-3xl bg-[#FAF8F5] border border-[#E8E2D9] flex flex-col justify-between space-y-5">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-4 group-hover:bg-[#0F766E] group-hover:text-white transition-colors">
+                <div className="w-12 h-12 rounded-2xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-5 shadow-xs">
                   <User className="w-6 h-6" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-base text-[#1C1917]">Elderly Individual</h3>
-                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2 py-0.5 rounded border border-[#E8E2D9]">
-                    Appaji (Age 74)
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-extrabold text-lg text-[#1C1917]">Elderly Individual</h3>
+                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2.5 py-1 rounded-full border border-[#E8E2D9]">
+                    Primary Autonomy
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                  Accessible 24px+ typography, bilingual Kannada/English guidance, 1-tap &quot;I took my medicine&quot; confirmation button. Zero complex charts.
+                <p className="text-xs text-[#57534E] leading-relaxed mb-4">
+                  Preserves independence and personal agency with simple, senior-friendly tools:
                 </p>
+                <ul className="space-y-2.5 text-xs text-[#1C1917]">
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Manages personal healthcare information.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Views medication schedules.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Records medication actions.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Remains central to personal care decisions.</span>
+                  </li>
+                </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center justify-between text-xs font-bold text-[#0F766E]">
-                <span>Launch Elderly View</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <div className="pt-4 border-t border-[#E8E2D9] text-[11px] text-[#57534E] flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />
+                <span>Large 64px touch targets &amp; regional language audio</span>
               </div>
-            </Link>
+            </div>
 
-            {/* Role 2: Family Member */}
-            <Link
-              href="/dashboard/family"
-              className="group p-5 rounded-2xl bg-[#FAF8F5] hover:bg-white border-2 border-transparent hover:border-[#0F766E] transition-all flex flex-col justify-between"
-            >
+            {/* Informational Role Card 2: Family Member */}
+            <div className="p-7 rounded-3xl bg-[#FAF8F5] border border-[#E8E2D9] flex flex-col justify-between space-y-5">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-4 group-hover:bg-[#0F766E] group-hover:text-white transition-colors">
+                <div className="w-12 h-12 rounded-2xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-5 shadow-xs">
                   <Users className="w-6 h-6" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-base text-[#1C1917]">Family Member</h3>
-                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2 py-0.5 rounded border border-[#E8E2D9]">
-                    Priya (Daughter)
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-extrabold text-lg text-[#1C1917]">Family Member</h3>
+                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2.5 py-1 rounded-full border border-[#E8E2D9]">
+                    Support &amp; Oversight
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                  Peace-of-mind dashboard: 7-day adherence trends, today&apos;s dose status, upcoming doctor consultations, and caretaker oversight.
+                <p className="text-xs text-[#57534E] leading-relaxed mb-4">
+                  Gives adult children peace of mind with real-time transparency and coordination:
                 </p>
+                <ul className="space-y-2.5 text-xs text-[#1C1917]">
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Supports healthcare coordination.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Views authorized care updates.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Receives relevant notifications.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Helps coordinate appointments and follow-ups.</span>
+                  </li>
+                </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center justify-between text-xs font-bold text-[#0F766E]">
-                <span>Launch Family View</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <div className="pt-4 border-t border-[#E8E2D9] text-[11px] text-[#57534E] flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />
+                <span>Grounded AI summaries &amp; adherence trends</span>
               </div>
-            </Link>
+            </div>
 
-            {/* Role 3: Caretaker */}
-            <Link
-              href="/dashboard/caretaker"
-              className="group p-5 rounded-2xl bg-[#FAF8F5] hover:bg-white border-2 border-transparent hover:border-[#0F766E] transition-all flex flex-col justify-between"
-            >
+            {/* Informational Role Card 3: Caretaker */}
+            <div className="p-7 rounded-3xl bg-[#FAF8F5] border border-[#E8E2D9] flex flex-col justify-between space-y-5">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-4 group-hover:bg-[#0F766E] group-hover:text-white transition-colors">
+                <div className="w-12 h-12 rounded-2xl bg-[#F3EDE5] text-[#0F766E] flex items-center justify-center mb-5 shadow-xs">
                   <Stethoscope className="w-6 h-6" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-base text-[#1C1917]">Caretaker</h3>
-                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2 py-0.5 rounded border border-[#E8E2D9]">
-                    Ramesh (Attendant)
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-extrabold text-lg text-[#1C1917]">Caretaker</h3>
+                  <span className="text-[11px] font-bold text-[#0F766E] bg-white px-2.5 py-1 rounded-full border border-[#E8E2D9]">
+                    Daily Assistance
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                  Daily task checklist, pending confirmation alerts, 1-click escalation resolution (observed administration, verbal reports), shift handover notes.
+                <p className="text-xs text-[#57534E] leading-relaxed mb-4">
+                  Empowers home attendants and nurses with clear shift routines and follow-up logging:
                 </p>
+                <ul className="space-y-2.5 text-xs text-[#1C1917]">
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Assists with daily care routines.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Helps monitor medication adherence.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Records follow-up actions.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-[#0F766E] shrink-0 mt-0.5" />
+                    <span>Communicates relevant updates to authorized family members.</span>
+                  </li>
+                </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center justify-between text-xs font-bold text-[#0F766E]">
-                <span>Launch Caretaker View</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <div className="pt-4 border-t border-[#E8E2D9] text-[11px] text-[#57534E] flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />
+                <span>Shift task queues &amp; handover documentation</span>
               </div>
-            </Link>
+            </div>
           </div>
-          <p className="text-[11px] text-[#57534E] mt-4 text-center">
-            * Sandbox roles allow interactive demonstration without modifying production account data.
-          </p>
         </div>
       </section>
 
-      {/* The Problem Statement We Solve */}
-      <section className="py-20 bg-white border-y border-[#E8E2D9]">
+      {/* SECTION 3: Closed-Loop Care Journey */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#0F766E] px-3.5 py-1 rounded-full bg-[#F3EDE5] border border-[#E8E2D9]">
+            Continuous Care Architecture
+          </span>
+          <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-[#1C1917] tracking-tight">
+            Care doesn&apos;t stop at reminders.
+          </h2>
+          <p className="mt-3 text-base text-[#57534E] leading-relaxed">
+            VATSALYA connects medication reminders, dose actions, follow-ups and family communication into one continuous care journey.
+          </p>
+        </div>
+
+        {/* 6 Connected Stages */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Stage 1 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  1
+                </span>
+                <Clock className="w-4 h-4 text-[#0F766E]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Medication scheduled</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                Doctor prescriptions, meal instructions (e.g. <i>After Breakfast</i>), dosage strengths, and reminder lead times are configured in the profile timezone.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-[#0F766E]">
+              Stage 1 • Prescription Schedule
+            </div>
+          </div>
+
+          {/* Stage 2 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  2
+                </span>
+                <Send className="w-4 h-4 text-[#0F766E]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Elderly person receives a reminder</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                15 minutes prior to target time, a friendly notification arrives on the elder&apos;s phone via Telegram bot and clear high-contrast in-app prompts.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-[#0F766E]">
+              Stage 2 • Gentle Proactive Alert
+            </div>
+          </div>
+
+          {/* Stage 3 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  3
+                </span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Dose action is recorded</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                The elder taps the large 64px button to confirm taking their medicine, or an attendant logs direct shift administration with mandatory notes.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-emerald-700">
+              Stage 3 • Action Recording
+            </div>
+          </div>
+
+          {/* Stage 4 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  4
+                </span>
+                <Activity className="w-4 h-4 text-[#D97706]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Medication status is evaluated</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                The deterministic engine tracks confirmation status against the clinical grace window. Doses transition from <code>SCHEDULED</code> to <code>TAKEN</code> or <code>OVERDUE</code>.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-[#D97706]">
+              Stage 4 • Status Evaluation
+            </div>
+          </div>
+
+          {/* Stage 5 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  5
+                </span>
+                <ShieldAlert className="w-4 h-4 text-[#B45309]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Family or caretaker is notified when necessary</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                If a dose remains unconfirmed past 30 minutes, caretakers receive an urgent alert to call or check in. At 60 minutes, family guardians receive priority escalation.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-[#B45309]">
+              Stage 5 • Multi-Tier Escalation
+            </div>
+          </div>
+
+          {/* Stage 6 */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="w-8 h-8 rounded-full bg-[#F3EDE5] text-[#0F766E] font-black text-sm flex items-center justify-center">
+                  6
+                </span>
+                <FileText className="w-4 h-4 text-[#0F766E]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1C1917]">Shared care history is updated</h3>
+              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
+                Every action, phone follow-up, and confirmation is logged into an immutable care timeline, updating adherence trends and Google Gemini daily summaries.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-[#E8E2D9] text-[11px] font-semibold text-[#0F766E]">
+              Stage 6 • Audit History &amp; Peace of Mind
+            </div>
+          </div>
+        </div>
+
+        {/* Clinical Accuracy Callout */}
+        <div className="mt-10 p-5 rounded-2xl bg-[#F3EDE5] border border-[#E8E2D9] text-xs text-[#57534E] leading-relaxed flex items-start gap-3">
+          <Info className="w-5 h-5 text-[#0F766E] shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-[#1C1917] block mb-0.5">Clinical Accuracy &amp; Verification Boundary:</strong>
+            A recorded dose action documents user confirmation and does not constitute physical proof of chemical ingestion. Verbal reports over phone (e.g. <code>ELDER_REPORTS_ALREADY_TAKEN</code>) remain unverified verbal notes until confirmed. VATSALYA coordinates care routines and does not diagnose conditions or prescribe medications.
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: Separate Demo Access Entry Point for Hackathon Judges */}
+      <section className="py-12 bg-white border-y border-[#E8E2D9]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="p-8 sm:p-10 rounded-3xl bg-[#FAF8F5] border-2 border-[#E8E2D9] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E8E2D9]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FEF3C7] text-[#B45309] flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-[#D97706]" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#1C1917]">
+                    Explore Demo (Fictional Sample Profiles)
+                  </h3>
+                  <p className="text-xs text-[#57534E]">
+                    Interactive demonstration sandbox designed specifically for hackathon evaluation
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-[#B45309] bg-[#FEF3C7] px-3.5 py-1.5 rounded-full border border-[#FDE68A] self-start sm:self-center">
+                Isolated Sandbox
+              </span>
+            </div>
+
+            <p className="mt-4 text-xs sm:text-sm text-[#57534E] leading-relaxed">
+              Explore VATSALYA&apos;s three distinct role interfaces using simulated sample profiles (Appaji, Priya, and Ramesh). This isolated demonstration environment uses fictional sample data to demonstrate features without requiring account registration. Demo access never modifies real user records and does not grant real healthcare permissions.
+            </p>
+
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link
+                href="/dashboard/elderly"
+                className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-[#0F766E]" />
+                  <span>Elderly Demo (Appaji)</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+
+              <Link
+                href="/dashboard/family"
+                className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
+              >
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#0F766E]" />
+                  <span>Family Demo (Priya)</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+
+              <Link
+                href="/dashboard/caretaker"
+                className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
+              >
+                <div className="flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-[#0F766E]" />
+                  <span>Caretaker Demo (Ramesh)</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5: The Problem Statement We Solve */}
+      <section className="py-20 bg-white border-b border-[#E8E2D9]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-xs font-bold uppercase tracking-wider text-[#0F766E] px-3.5 py-1 rounded-full bg-[#F3EDE5] border border-[#E8E2D9]">
@@ -290,132 +540,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works: 4-Stage Medication Lifecycle */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="text-xs font-bold uppercase tracking-wider text-[#0F766E] px-3.5 py-1 rounded-full bg-[#F3EDE5] border border-[#E8E2D9]">
-            Workflow Architecture
-          </span>
-          <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold text-[#1C1917]">
-            How VATSALYA Coordinates Care
-          </h2>
-          <p className="mt-3 text-base text-[#57534E] leading-relaxed">
-            A deterministic, reliable medication lifecycle that never leaves an elderly patient unsupported.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Step 1 */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-black text-[#0F766E] bg-[#F3EDE5] w-7 h-7 rounded-full flex items-center justify-center mb-4">
-                1
-              </span>
-              <h3 className="text-lg font-bold text-[#1C1917]">Schedule &amp; Context</h3>
-              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                Family or caretakers set up medication with food instructions (e.g. <i>After Breakfast</i>, <i>With Lunch</i>), dosage forms, and specific target times.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center gap-2 text-[11px] font-semibold text-[#1C1917]">
-              <Pill className="w-3.5 h-3.5 text-[#0F766E]" />
-              <span>Multi-slot daily schedules</span>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-black text-[#0F766E] bg-[#F3EDE5] w-7 h-7 rounded-full flex items-center justify-center mb-4">
-                2
-              </span>
-              <h3 className="text-lg font-bold text-[#1C1917]">Gentle Reminders</h3>
-              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                15 minutes before the dose, the elder receives a clear alert. If linked, their official Telegram bot sends a gentle notification in the family&apos;s preferred language.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center gap-2 text-[11px] font-semibold text-[#1C1917]">
-              <Send className="w-3.5 h-3.5 text-[#0F766E]" />
-              <span>Telegram Bot + In-App</span>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-black text-[#0F766E] bg-[#F3EDE5] w-7 h-7 rounded-full flex items-center justify-center mb-4">
-                3
-              </span>
-              <h3 className="text-lg font-bold text-[#1C1917]">1-Tap Confirmation</h3>
-              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                The elder simply taps the large 64px &quot;Mark as Taken&quot; button. Instantly, all family members and caretakers see the dose marked as completed.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center gap-2 text-[11px] font-semibold text-[#1C1917]">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Real-time state synchronization</span>
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E8E2D9] shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-black text-[#0F766E] bg-[#F3EDE5] w-7 h-7 rounded-full flex items-center justify-center mb-4">
-                4
-              </span>
-              <h3 className="text-lg font-bold text-[#1C1917]">Smart Escalation</h3>
-              <p className="mt-2 text-xs text-[#57534E] leading-relaxed">
-                If the dose remains unconfirmed 30 mins past due, the assigned caretaker receives a priority alert to call or assist in person. At 60 mins, family admins are alerted.
-              </p>
-            </div>
-            <div className="mt-4 pt-3 border-t border-[#E8E2D9] flex items-center gap-2 text-[11px] font-semibold text-[#1C1917]">
-              <ShieldAlert className="w-3.5 h-3.5 text-[#D97706]" />
-              <span>Multi-tier care escalation</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Clinical Safety & Dignity Principles */}
-      <section className="py-16 bg-white border-y border-[#E8E2D9]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="p-8 sm:p-12 rounded-3xl bg-[#FAF8F5] border border-[#E8E2D9] shadow-xs">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-[#F3EDE5] flex items-center justify-center text-[#0F766E]">
-                <ShieldCheck className="w-6 h-6 text-[#0F766E]" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-extrabold text-[#1C1917]">
-                  Clinical Safety &amp; Dignity Guardrails
-                </h2>
-                <p className="text-xs text-[#57534E]">Core ethical and medical principles embedded into every layer of VATSALYA</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-[#57534E]">
-              <div className="space-y-2">
-                <h3 className="font-bold text-[#1C1917] text-base">Explicit Confirmation Required</h3>
-                <p className="leading-relaxed text-xs">
-                  A dose is never presumed taken just because time passed or a notification was delivered. A dose transitions to <code>TAKEN</code> only with an explicit user action.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-bold text-[#1C1917] text-base">Verbal Reports Decoupled from Ingestion</h3>
-                <p className="leading-relaxed text-xs">
-                  When an elder verbally reports having taken medicine over the phone, the caretaker logs it as <code>ELDER_REPORTS_ALREADY_TAKEN</code>. It resolves the escalation alert without fabricating physical clinical proof.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-bold text-[#1C1917] text-base">Anti-Doubling Clinical Safeguard</h3>
-                <p className="leading-relaxed text-xs">
-                  VATSALYA alerts remind loved ones to check in, never encouraging double-dosing. Overdue notifications explicitly display: <i>&quot;Never take an additional dose without consulting the prescribing physician.&quot;</i>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Doctor Appointments & Shared Health Records */}
+      {/* SECTION 6: Doctor Appointments & Secure Member Access */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>

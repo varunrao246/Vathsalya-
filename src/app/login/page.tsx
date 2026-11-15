@@ -1,94 +1,175 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { HeartHandshake, Shield, Mail, Lock, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
-import { signInWithEmail, isSupabaseConfigured } from "@/lib/auth/auth-client";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  HeartHandshake,
+  Mail,
+  Lock,
+  AlertCircle,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
+import {
+  signInWithEmail,
+  resendVerificationEmail,
+  isSupabaseConfigured,
+} from "@/lib/auth/auth-client";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const urlError = searchParams.get("error");
+  const verifiedParam = searchParams.get("verified");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    urlError ? decodeURIComponent(urlError) : null
+  );
+  const [successMessage, setSuccessMessage] = useState<string | null>(
+    verifiedParam === "true"
+      ? "Email confirmed successfully! You can now sign in to your account."
+      : null
+  );
+
+  // Resend verification state for unconfirmed users
+  const [showResend, setShowResend] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendFeedback, setResendFeedback] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setShowResend(false);
     setLoading(true);
 
     try {
       await signInWithEmail(email, password);
-      setSuccessMessage("Authentication successful! Redirecting to dashboard...");
+      setSuccessMessage("Authentication successful! Loading your dashboard...");
       setTimeout(() => {
         router.push("/dashboard/family");
-      }, 1000);
+      }, 800);
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to sign in. Please verify your credentials.");
+      const msg = err instanceof Error ? err.message : "Failed to sign in. Please verify your credentials.";
+      setErrorMessage(msg);
+
+      if (msg.toLowerCase().includes("not verified") || msg.toLowerCase().includes("not confirmed")) {
+        setShowResend(true);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResend = async () => {
+    if (!email || resendCooldown > 0 || resending) return;
+    setResending(true);
+    setResendFeedback(null);
+
+    try {
+      await resendVerificationEmail(email);
+      setResendFeedback("Verification link re-sent! Please check your inbox and spam folder.");
+      setResendCooldown(60);
+    } catch (err: unknown) {
+      setResendFeedback(
+        err instanceof Error ? err.message : "Could not resend email right now. Please try again shortly."
+      );
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-[#FDFBF7]">
+    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-[#FAF8F5]">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2 mb-6 group">
-          <div className="w-12 h-12 rounded-2xl bg-[#1E3A2F] text-white flex items-center justify-center shadow-xs">
-            <HeartHandshake className="w-7 h-7 text-[#EBF2EE]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#0F766E] text-white flex items-center justify-center shadow-xs">
+            <HeartHandshake className="w-7 h-7 text-[#FAF8F5]" />
           </div>
-          <span className="text-2xl font-bold tracking-tight text-[#1E3A2F]">VATSALYA</span>
-          <span className="text-lg font-medium text-[#607B6E]">वात्सल्य</span>
+          <span className="text-2xl font-black tracking-tight text-[#1C1917]">VATSALYA</span>
+          <span className="text-lg font-bold text-[#0F766E] font-serif">वात्सल्य</span>
         </Link>
-        <h1 className="text-center text-3xl font-bold tracking-tight text-[#1E3A2F]">
+        <h1 className="text-center text-3xl font-black tracking-tight text-[#1C1917]">
           Welcome Back
         </h1>
-        <p className="mt-2 text-center text-sm text-[#5C6460]">
+        <p className="mt-2 text-center text-sm text-[#57534E]">
           Sign in to access your healthcare profile or manage your loved one&apos;s care.
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-xs border border-[#EFECE6] sm:rounded-3xl sm:px-10">
-          {/* Status banner */}
-          {!configured ? (
+        <div className="bg-white py-8 px-6 shadow-sm border border-[#E8E2D9] sm:rounded-3xl sm:px-10">
+          {!configured && (
             <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-800 shrink-0 mt-0.5" />
               <div className="text-xs text-amber-900 leading-relaxed">
                 <span className="font-bold block mb-0.5">Live Supabase Credentials Pending</span>
-                Live authentication requires <code className="bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> in <code className="bg-amber-100 px-1 py-0.5 rounded">.env.local</code>. You can explore our role previews below.
-              </div>
-            </div>
-          ) : (
-            <div className="mb-6 p-4 rounded-2xl bg-[#EBF2EE] border border-[#D5E2D9] flex items-start gap-3">
-              <Shield className="w-5 h-5 text-[#1E3A2F] shrink-0 mt-0.5" />
-              <div className="text-xs text-[#1E3A2F] leading-relaxed">
-                <span className="font-bold block mb-0.5">Supabase Auth Connected</span>
-                Sessions are cryptographically verified through secure HttpOnly cookies.
+                Live authentication connects to Supabase Auth. Set <code className="bg-amber-100 px-1 py-0.5 rounded">NEXT_PUBLIC_SUPABASE_URL</code> in <code className="bg-amber-100 px-1 py-0.5 rounded">.env.local</code>.
               </div>
             </div>
           )}
 
           {errorMessage && (
-            <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 font-medium">
-              {errorMessage}
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <div className="leading-relaxed">
+                <span>{errorMessage}</span>
+                {showResend && (
+                  <div className="mt-2.5 pt-2 border-t border-rose-200/60">
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={resendCooldown > 0 || resending}
+                      className="text-xs font-bold text-[#0F766E] underline hover:text-[#0D655E] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${resending ? "animate-spin" : ""}`} />
+                      <span>
+                        {resendCooldown > 0
+                          ? `Resend available in ${resendCooldown}s`
+                          : resending
+                          ? "Sending..."
+                          : "Resend Verification Email to this address"}
+                      </span>
+                    </button>
+                    {resendFeedback && (
+                      <p className="mt-1 text-[11px] text-emerald-800 font-bold">{resendFeedback}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold">
-              {successMessage}
+            <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{successMessage}</span>
             </div>
           )}
 
           <form className="space-y-5" onSubmit={handleLogin}>
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-[#1F2421]">
+              <label htmlFor="email" className="block text-xs font-bold text-[#1C1917] uppercase tracking-wider">
                 Email Address
               </label>
               <div className="mt-1 relative">
@@ -101,20 +182,20 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="name@example.com"
-                  className="w-full px-4 py-3 rounded-xl border border-[#EFECE6] bg-[#FDFBF7] text-[#1F2421] placeholder-[#5C6460]/60 focus:bg-white text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-[#E8E2D9] bg-[#FAF8F5] text-[#1C1917] placeholder-[#57534E]/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F766E] text-sm"
                 />
-                <Mail className="w-5 h-5 text-[#607B6E] absolute right-3.5 top-3" />
+                <Mail className="w-5 h-5 text-[#57534E] absolute right-3.5 top-3" />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-semibold text-[#1F2421]">
+                <label htmlFor="password" className="block text-xs font-bold text-[#1C1917] uppercase tracking-wider">
                   Password
                 </label>
-                <a href="#" className="text-xs font-semibold text-[#607B6E] hover:underline">
-                  Forgot password?
-                </a>
+                <Link href="/join" className="text-xs font-bold text-[#0F766E] hover:underline">
+                  Have a passcode?
+                </Link>
               </div>
               <div className="mt-1 relative">
                 <input
@@ -126,9 +207,9 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 rounded-xl border border-[#EFECE6] bg-[#FDFBF7] text-[#1F2421] placeholder-[#5C6460]/60 focus:bg-white text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-[#E8E2D9] bg-[#FAF8F5] text-[#1C1917] placeholder-[#57534E]/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0F766E] text-sm"
                 />
-                <Lock className="w-5 h-5 text-[#607B6E] absolute right-3.5 top-3" />
+                <Lock className="w-5 h-5 text-[#57534E] absolute right-3.5 top-3" />
               </div>
             </div>
 
@@ -136,16 +217,16 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-xs text-sm font-semibold text-white bg-[#1E3A2F] hover:bg-[#162E25] transition-colors disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-[#0F766E] hover:bg-[#0D655E] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Signing In...
+                    <span>Signing In...</span>
                   </>
                 ) : (
                   <>
-                    Sign In
+                    <span>Sign In</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -153,27 +234,36 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Quick Role Preview Jump for Evaluators */}
-          <div className="mt-6 pt-6 border-t border-[#EFECE6]">
-            <p className="text-xs font-bold text-[#607B6E] uppercase tracking-wider text-center mb-3">
-              Role Demo Previews (Offline Simulation):
+          {/* Separate Demo Sandbox Entry Point */}
+          <div className="mt-6 pt-6 border-t border-[#E8E2D9]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-[#0F766E] uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
+                Explore Demo (Sample Data)
+              </span>
+              <span className="text-[10px] text-[#57534E] bg-[#F3EDE5] px-2 py-0.5 rounded-full border border-[#E8E2D9]">
+                Evaluation Sandbox
+              </span>
+            </div>
+            <p className="text-[11px] text-[#57534E] mb-3">
+              Fictional demonstration mode for hackathon judges. Explore the three role perspectives without real account sign-in:
             </p>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs font-medium">
+            <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
               <Link
                 href="/dashboard/elderly"
-                className="p-2 rounded-lg bg-[#FDFBF7] border border-[#EFECE6] text-[#1E3A2F] hover:bg-[#EBF2EE]"
+                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
               >
                 Elderly
               </Link>
               <Link
                 href="/dashboard/family"
-                className="p-2 rounded-lg bg-[#FDFBF7] border border-[#EFECE6] text-[#1E3A2F] hover:bg-[#EBF2EE]"
+                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
               >
                 Family
               </Link>
               <Link
                 href="/dashboard/caretaker"
-                className="p-2 rounded-lg bg-[#FDFBF7] border border-[#EFECE6] text-[#1E3A2F] hover:bg-[#EBF2EE]"
+                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
               >
                 Caretaker
               </Link>
@@ -181,9 +271,9 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-[#5C6460]">
+            <p className="text-sm text-[#57534E]">
               Don&apos;t have an account?{" "}
-              <Link href="/register" className="font-semibold text-[#1E3A2F] hover:underline">
+              <Link href="/register" className="font-bold text-[#0F766E] hover:underline">
                 Create one now
               </Link>
             </p>
@@ -191,5 +281,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5]">
+          <Loader2 className="w-6 h-6 animate-spin text-[#0F766E]" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
