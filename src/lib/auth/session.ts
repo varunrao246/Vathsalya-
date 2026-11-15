@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export interface AuthenticatedUser {
@@ -6,7 +7,7 @@ export interface AuthenticatedUser {
 }
 
 /**
- * Retrieve authenticated user from active session cookie.
+ * Retrieve authenticated user from active session cookie or Authorization Bearer token.
  * Returns null if not authenticated or if Supabase environment is unconfigured.
  */
 export async function getAuthUser(): Promise<AuthenticatedUser | null> {
@@ -15,11 +16,22 @@ export async function getAuthUser(): Promise<AuthenticatedUser | null> {
   }
 
   try {
+    let token: string | undefined;
+    try {
+      const headerList = await headers();
+      const authHeader = headerList.get("authorization");
+      if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+        token = authHeader.slice(7).trim();
+      }
+    } catch {
+      // In testing environments or static contexts where headers() may be unavailable
+    }
+
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (error || !user) {
       return null;
