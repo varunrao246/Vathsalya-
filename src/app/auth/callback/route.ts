@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,6 @@ export async function GET(req: Request) {
   const type = requestUrl.searchParams.get("type");
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
-  const next = requestUrl.searchParams.get("next") || "/onboard";
 
   // 1. If this is an email confirmation link (has token_hash or signup/email type), forward to /auth/confirm
   if (token_hash || type === "signup" || type === "email") {
@@ -42,32 +42,52 @@ export async function GET(req: Request) {
       const supabase = await createServerSupabaseClient();
       const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-      if (exchangeError) {
+      if (exchangeError || !data.user) {
         const loginUrl = new URL("/login", requestUrl.origin);
-        loginUrl.searchParams.set("error", exchangeError.message);
+        loginUrl.searchParams.set("error", exchangeError?.message || "Failed to establish session.");
         return NextResponse.redirect(loginUrl);
       }
 
-      // Check if this user already has an existing healthcare profile access record
-      if (data.user?.id) {
-        const { data: accesses } = await supabase
-          .from("healthcare_profile_access")
-          .select("role, status, profile_id")
-          .eq("user_id", data.user.id)
-          .eq("status", "ACTIVE")
-          .limit(1);
+      const admin = createAdminClient();
 
-        if (accesses && accesses.length > 0) {
-          const role = accesses[0].role;
-          if (role === "CARETAKER") {
-            return NextResponse.redirect(new URL("/dashboard/caretaker", requestUrl.origin));
-          }
-          return NextResponse.redirect(new URL("/dashboard/family", requestUrl.origin));
+      // Ensure user's profile record is populated with their Google OAuth metadata
+      const meta = data.user.user_metadata || {};
+      const fullName = (meta.full_name || meta.name || data.user.email?.split("@")[0] || "") as string;
+      const avatarUrl = (meta.avatar_url || "") as string;
+
+      await admin.from("profiles").upsert(
+        {
+          id: data.user.id,
+          email: data.user.email,
+          full_name: fullName || null,
+          avatar_url: avatarUrl || null,
+          preferred_language: "en",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+
+      // Check if this user already has an existing healthcare profile access record
+      const { data: members } = await admin
+        .from("profile_access_members")
+        .select("healthcare_profile_id, role, status")
+        .eq("profile_id", data.user.id)
+        .eq("status", "ACTIVE");
+
+      if (members && members.length > 0) {
+        // User has authorized healthcare profiles! Route based on their primary role
+        const role = members[0].role;
+        if (role === "ELDERLY") {
+          return NextResponse.redirect(new URL("/dashboard/elderly", requestUrl.origin));
         }
+        if (role === "CARETAKER") {
+          return NextResponse.redirect(new URL("/dashboard/caretaker", requestUrl.origin));
+        }
+        return NextResponse.redirect(new URL("/dashboard/family", requestUrl.origin));
       }
 
-      // New users proceed to onboarding to choose their setup role
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      // New user with no healthcare profiles -> Redirect strictly to onboarding
+      return NextResponse.redirect(new URL("/onboard", requestUrl.origin));
     } catch (err: unknown) {
       const loginUrl = new URL("/login", requestUrl.origin);
       loginUrl.searchParams.set(

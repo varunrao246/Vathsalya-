@@ -376,7 +376,7 @@ export default function Home() {
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Link
-                href="/dashboard/elderly"
+                href="/dashboard/elderly?demo=true"
                 className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
               >
                 <div className="flex items-center gap-2">
@@ -387,7 +387,7 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/dashboard/family"
+                href="/dashboard/family?demo=true"
                 className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
               >
                 <div className="flex items-center gap-2">
@@ -398,7 +398,7 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/dashboard/caretaker"
+                href="/dashboard/caretaker?demo=true"
                 className="p-4 rounded-2xl bg-white border border-[#E8E2D9] hover:border-[#0F766E] text-[#1C1917] hover:text-[#0F766E] transition-all flex items-center justify-between text-xs font-bold shadow-xs group"
               >
                 <div className="flex items-center gap-2">
@@ -608,13 +608,13 @@ export default function Home() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 font-semibold">
-            <Link href="/dashboard/elderly" className="hover:text-[#0F766E] transition-colors">
+            <Link href="/dashboard/elderly?demo=true" className="hover:text-[#0F766E] transition-colors">
               Elderly View
             </Link>
-            <Link href="/dashboard/family" className="hover:text-[#0F766E] transition-colors">
+            <Link href="/dashboard/family?demo=true" className="hover:text-[#0F766E] transition-colors">
               Family View
             </Link>
-            <Link href="/dashboard/caretaker" className="hover:text-[#0F766E] transition-colors">
+            <Link href="/dashboard/caretaker?demo=true" className="hover:text-[#0F766E] transition-colors">
               Caretaker View
             </Link>
             <Link href="/join" className="hover:text-[#0F766E] transition-colors">

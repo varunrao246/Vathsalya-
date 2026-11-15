@@ -13,9 +13,11 @@ import {
   ArrowLeft,
   Loader2,
 } from "lucide-react";
+import { useDashboard } from "@/context/DashboardContext";
 
 export default function NotificationSettingsPage() {
-  const [profileId] = useState("sample-profile-id");
+  const { activeProfile, isDemo } = useDashboard();
+  const profileId = activeProfile?.id || (isDemo ? "demo-profile-appaji" : "");
   const [telegramStatus, setTelegramStatus] = useState<{
     isConfigured: boolean;
     isLinked: boolean;
@@ -54,16 +56,18 @@ export default function NotificationSettingsPage() {
         }
 
         // Load Preferences
-        const prefRes = await fetch(
-          `/api/notifications/preferences?healthcareProfileId=${profileId}`
-        );
-        const prefJson = await prefRes.json();
-        if (prefJson.success && prefJson.data) {
-          setTelegramEnabled(prefJson.data.telegramEnabled);
-          setEmailEnabled(prefJson.data.emailEnabled);
-          setReminderMinutesBefore(prefJson.data.reminderMinutesBefore);
-          setOverdueCaretakerGraceMinutes(prefJson.data.overdueCaretakerGraceMinutes);
-          setFamilyEscalationGraceMinutes(prefJson.data.familyEscalationGraceMinutes);
+        if (profileId) {
+          const prefRes = await fetch(
+            `/api/notifications/preferences?healthcareProfileId=${profileId}`
+          );
+          const prefJson = await prefRes.json();
+          if (prefJson.success && prefJson.data) {
+            setTelegramEnabled(prefJson.data.telegramEnabled);
+            setEmailEnabled(prefJson.data.emailEnabled);
+            setReminderMinutesBefore(prefJson.data.reminderMinutesBefore);
+            setOverdueCaretakerGraceMinutes(prefJson.data.overdueCaretakerGraceMinutes);
+            setFamilyEscalationGraceMinutes(prefJson.data.familyEscalationGraceMinutes);
+          }
         }
       } catch {
         // Fallback simulation state

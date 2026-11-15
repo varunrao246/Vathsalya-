@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Users,
   Shield,
@@ -11,7 +12,9 @@ import {
   Clock,
   Loader2,
   XCircle,
+  HeartHandshake,
 } from "lucide-react";
+import { useDashboard } from "@/context/DashboardContext";
 
 interface Member {
   id: string;
@@ -42,7 +45,7 @@ interface Invitation {
 }
 
 export default function MemberManagementPage() {
-  const [profileId, setProfileId] = useState<string>("sample-profile-id");
+  const { activeProfile, isDemo, loading: dashboardLoading } = useDashboard();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,43 +61,49 @@ export default function MemberManagementPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Load active profile and member data
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const profileRes = await fetch("/api/healthcare-profiles");
-        const profileJson = await profileRes.json();
-        let targetId = "sample-profile-id";
-
-        if (profileJson.success && profileJson.data && profileJson.data.length > 0) {
-          targetId = profileJson.data[0].healthcare_profile.id;
-          setProfileId(targetId);
-
-          // Load members
-          const membersRes = await fetch(`/api/profile-access/members?healthcareProfileId=${targetId}`);
-          const membersJson = await membersRes.json();
-          if (membersJson.success) {
-            setMembers(membersJson.data.members || []);
-          }
-
-          // Load invitations
-          const inviteRes = await fetch(`/api/profile-access/invitations?healthcareProfileId=${targetId}`);
-          const inviteJson = await inviteRes.json();
-          if (inviteJson.success) {
-            setInvitations(inviteJson.data || []);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load members or invitations", err);
-      } finally {
-        setLoading(false);
+  const loadData = useCallback(async (targetId: string) => {
+    setLoading(true);
+    try {
+      // Load members
+      const membersRes = await fetch(`/api/profile-access/members?healthcareProfileId=${targetId}`);
+      const membersJson = await membersRes.json();
+      if (membersJson.success) {
+        setMembers(membersJson.data.members || []);
+      } else {
+        setMembers([]);
       }
+
+      // Load invitations
+      const inviteRes = await fetch(`/api/profile-access/invitations?healthcareProfileId=${targetId}`);
+      const inviteJson = await inviteRes.json();
+      if (inviteJson.success) {
+        setInvitations(inviteJson.data || []);
+      } else {
+        setInvitations([]);
+      }
+    } catch (err) {
+      console.error("Failed to load members or invitations", err);
+      setMembers([]);
+      setInvitations([]);
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, []);
+
+  useEffect(() => {
+    if (activeProfile) {
+      loadData(activeProfile.id);
+    } else {
+      setMembers([]);
+      setInvitations([]);
+      setLoading(false);
+    }
+  }, [activeProfile, loadData]);
 
   // Handle invitation creation
   const handleGenerateInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeProfile) return;
     setGenerating(true);
     setErrorMessage(null);
     setGeneratedCode(null);
@@ -104,7 +113,7 @@ export default function MemberManagementPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          healthcareProfileId: profileId,
+          healthcareProfileId: activeProfile.id,
           invitedRole,
           canManageMeds,
           canConfirmDoses,
@@ -122,7 +131,7 @@ export default function MemberManagementPage() {
       });
 
       // Refresh invitations list
-      const inviteRes = await fetch(`/api/profile-access/invitations?healthcareProfileId=${profileId}`);
+      const inviteRes = await fetch(`/api/profile-access/invitations?healthcareProfileId=${activeProfile.id}`);
       const inviteJson = await inviteRes.json();
       if (inviteJson.success) {
         setInvitations(inviteJson.data || []);
@@ -183,65 +192,94 @@ export default function MemberManagementPage() {
     }
   };
 
-  // Sample fallback data if offline/demo
-  const displayMembers: Member[] =
-    members.length > 0
-      ? members
-      : [
-          {
-            id: "mem-1",
-            profile_id: "user-1",
-            role: "ELDERLY",
-            can_manage_meds: true,
-            can_manage_appointments: true,
-            can_confirm_doses: true,
-            status: "ACTIVE",
-            joined_at: "2026-11-15T09:00:00.000Z",
-            profile: {
-              full_name: "Appaji Rao",
-              email: "appaji@example.com",
-              phone: "+91 98765 00000",
-            },
-          },
-          {
-            id: "mem-2",
-            profile_id: "user-2",
-            role: "FAMILY_ADMIN",
-            can_manage_meds: true,
-            can_manage_appointments: true,
-            can_confirm_doses: true,
-            status: "ACTIVE",
-            joined_at: "2026-11-15T09:15:00.000Z",
-            profile: {
-              full_name: "Priya Sharma",
-              email: "priya@example.com",
-              phone: "+91 98765 43210",
-            },
-          },
-          {
-            id: "mem-3",
-            profile_id: "user-3",
-            role: "CARETAKER",
-            can_manage_meds: false,
-            can_manage_appointments: false,
-            can_confirm_doses: true,
-            status: "ACTIVE",
-            joined_at: "2026-11-15T09:30:00.000Z",
-            profile: {
-              full_name: "Suresh Kumar",
-              email: "suresh.nurse@example.com",
-              phone: "+91 98450 11111",
-            },
-          },
-        ];
+  // Fictional demo members strictly for explicit Demo Sandbox mode only
+  const FICTIONAL_DEMO_MEMBERS: Member[] = [
+    {
+      id: "mem-1",
+      profile_id: "user-1",
+      role: "ELDERLY",
+      can_manage_meds: true,
+      can_manage_appointments: true,
+      can_confirm_doses: true,
+      status: "ACTIVE",
+      joined_at: "2026-11-15T09:00:00.000Z",
+      profile: {
+        full_name: "Appaji Rao",
+        email: "appaji@example.com",
+        phone: "+91 98765 00000",
+      },
+    },
+    {
+      id: "mem-2",
+      profile_id: "user-2",
+      role: "FAMILY_ADMIN",
+      can_manage_meds: true,
+      can_manage_appointments: true,
+      can_confirm_doses: true,
+      status: "ACTIVE",
+      joined_at: "2026-11-15T09:15:00.000Z",
+      profile: {
+        full_name: "Priya Sharma",
+        email: "priya@example.com",
+        phone: "+91 98765 43210",
+      },
+    },
+    {
+      id: "mem-3",
+      profile_id: "user-3",
+      role: "CARETAKER",
+      can_manage_meds: false,
+      can_manage_appointments: false,
+      can_confirm_doses: true,
+      status: "ACTIVE",
+      joined_at: "2026-11-15T09:30:00.000Z",
+      profile: {
+        full_name: "Suresh Kumar",
+        email: "suresh.nurse@example.com",
+        phone: "+91 98450 11111",
+      },
+    },
+  ];
 
-  if (loading) {
+  // Strictly isolate real authenticated users from fictional demo data
+  const displayMembers: Member[] =
+    isDemo && members.length === 0 ? FICTIONAL_DEMO_MEMBERS : members;
+
+  if (loading || dashboardLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-8 h-8 animate-spin text-[#1E3A2F]" />
       </div>
     );
   }
+
+  if (!activeProfile && !isDemo) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center mx-auto shadow-xs">
+          <HeartHandshake className="w-9 h-9" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#1E3A2F]">
+            No Healthcare Profile Found
+          </h1>
+          <p className="text-sm text-[#5C6460]">
+            You have not linked or created any healthcare profiles yet. Create a profile to invite and govern care members.
+          </p>
+        </div>
+        <div className="flex justify-center pt-2">
+          <Link
+            href="/onboard"
+            className="px-6 py-3 rounded-xl bg-[#1E3A2F] text-white font-bold text-sm hover:bg-[#162E25] shadow-xs"
+          >
+            Create Healthcare Profile
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const patientName = activeProfile?.displayName || "Healthcare";
 
   return (
     <div className="space-y-8">
@@ -252,10 +290,10 @@ export default function MemberManagementPage() {
             Authorized Access Governance
           </span>
           <h1 className="mt-2 text-3xl font-extrabold text-[#1E3A2F]">
-            Member &amp; Passcode Access Management
+            {patientName}&apos;s Care Team &amp; Passcode Access
           </h1>
           <p className="text-sm text-[#5C6460]">
-            Manage authorized family members and caretakers. Generate secure, time-limited 6-digit passcodes.
+            Manage authorized family members and caretakers for {patientName}. Generate secure, time-limited 6-digit passcodes.
           </p>
         </div>
 
@@ -307,7 +345,14 @@ export default function MemberManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EFECE6]">
-              {displayMembers.map((member) => (
+              {displayMembers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-xs text-[#5C6460] italic">
+                    No authorized members found. Click &quot;Generate Access Passcode&quot; above to invite family or caretakers.
+                  </td>
+                </tr>
+              ) : (
+                displayMembers.map((member) => (
                 <tr key={member.id} className="hover:bg-[#FDFBF7]/60 transition-colors">
                   <td className="py-4 px-4">
                     <p className="font-bold text-[#1E3A2F]">
@@ -358,7 +403,7 @@ export default function MemberManagementPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

@@ -83,9 +83,27 @@ export default function LoginPage() {
     try {
       await signInWithEmail(email, password);
       setSuccessMessage("Authentication successful! Loading your dashboard...");
-      setTimeout(() => {
+      
+      // Check user's authorized healthcare profiles
+      try {
+        const profileRes = await fetch("/api/healthcare-profiles");
+        const profileJson = await profileRes.json();
+        if (profileJson.success && Array.isArray(profileJson.data) && profileJson.data.length > 0) {
+          const firstProfile = profileJson.data[0];
+          const userRole = firstProfile.role;
+          if (userRole === "ELDERLY") {
+            router.push("/dashboard/elderly");
+          } else if (userRole === "CARETAKER") {
+            router.push("/dashboard/caretaker");
+          } else {
+            router.push("/dashboard/family");
+          }
+        } else {
+          router.push("/onboard");
+        }
+      } catch {
         router.push("/dashboard/family");
-      }, 800);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sign in. Please verify your credentials.";
       setErrorMessage(msg);
@@ -351,19 +369,19 @@ export default function LoginPage() {
               </p>
               <div className="flex items-center justify-center gap-2 font-semibold">
                 <Link
-                  href="/dashboard/elderly"
+                  href="/dashboard/elderly?demo=true"
                   className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
                 >
                   Elderly
                 </Link>
                 <Link
-                  href="/dashboard/family"
+                  href="/dashboard/family?demo=true"
                   className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
                 >
                   Family
                 </Link>
                 <Link
-                  href="/dashboard/caretaker"
+                  href="/dashboard/caretaker?demo=true"
                   className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
                 >
                   Caretaker

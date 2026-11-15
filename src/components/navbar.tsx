@@ -41,7 +41,7 @@ export function Navbar() {
             Demo Sandbox:
           </span>
           <Link
-            href="/dashboard/elderly"
+            href="/dashboard/elderly?demo=true"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/elderly"
                 ? "bg-white text-[#1C1917] shadow-xs"
@@ -52,7 +52,7 @@ export function Navbar() {
             Elderly
           </Link>
           <Link
-            href="/dashboard/family"
+            href="/dashboard/family?demo=true"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/family"
                 ? "bg-white text-[#1C1917] shadow-xs"
@@ -63,7 +63,7 @@ export function Navbar() {
             Family
           </Link>
           <Link
-            href="/dashboard/caretaker"
+            href="/dashboard/caretaker?demo=true"
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
               pathname === "/dashboard/caretaker"
                 ? "bg-white text-[#1C1917] shadow-xs"
@@ -126,7 +126,7 @@ export function Navbar() {
             </span>
             <div className="grid grid-cols-1 gap-1.5">
               <Link
-                href="/dashboard/elderly"
+                href="/dashboard/elderly?demo=true"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 p-2.5 rounded-xl bg-white text-sm font-bold text-[#1E3A2F]"
               >
@@ -134,7 +134,7 @@ export function Navbar() {
                 Elderly Mode (Appaji)
               </Link>
               <Link
-                href="/dashboard/family"
+                href="/dashboard/family?demo=true"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 p-2.5 rounded-xl bg-white text-sm font-bold text-[#1E3A2F]"
               >
@@ -142,7 +142,7 @@ export function Navbar() {
                 Family Member Mode (Priya)
               </Link>
               <Link
-                href="/dashboard/caretaker"
+                href="/dashboard/caretaker?demo=true"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 p-2.5 rounded-xl bg-white text-sm font-bold text-[#1E3A2F]"
               >

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Pill,
   Clock,
@@ -10,7 +11,9 @@ import {
   XCircle,
   Pause,
   Play,
+  HeartHandshake,
 } from "lucide-react";
+import { useDashboard } from "@/context/DashboardContext";
 
 interface ScheduleSlot {
   targetTime: string;
@@ -43,7 +46,7 @@ interface Medication {
 }
 
 export default function MedicationsManagementPage() {
-  const [profileId, setProfileId] = useState<string>("sample-profile-id");
+  const { activeProfile, isDemo, loading: dashboardLoading } = useDashboard();
   const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,32 +71,33 @@ export default function MedicationsManagementPage() {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load medications
-  useEffect(() => {
-    async function loadMeds() {
-      try {
-        const profileRes = await fetch("/api/healthcare-profiles");
-        const profileJson = await profileRes.json();
-        let targetId = "sample-profile-id";
-
-        if (profileJson.success && profileJson.data && profileJson.data.length > 0) {
-          targetId = profileJson.data[0].healthcare_profile.id;
-          setProfileId(targetId);
-
-          const medsRes = await fetch(`/api/medications?healthcareProfileId=${targetId}`);
-          const medsJson = await medsRes.json();
-          if (medsJson.success) {
-            setMedications(medsJson.data || []);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load medications", err);
-      } finally {
-        setLoading(false);
+  // Load medications for active profile
+  const loadMeds = useCallback(async (profileId: string) => {
+    setLoading(true);
+    try {
+      const medsRes = await fetch(`/api/medications?healthcareProfileId=${profileId}`);
+      const medsJson = await medsRes.json();
+      if (medsJson.success && Array.isArray(medsJson.data)) {
+        setMedications(medsJson.data);
+      } else {
+        setMedications([]);
       }
+    } catch (err) {
+      console.error("Failed to load medications", err);
+      setMedications([]);
+    } finally {
+      setLoading(false);
     }
-    loadMeds();
   }, []);
+
+  useEffect(() => {
+    if (activeProfile) {
+      loadMeds(activeProfile.id);
+    } else {
+      setMedications([]);
+      setLoading(false);
+    }
+  }, [activeProfile, loadMeds]);
 
   // Slot configurator helpers
   const addSlot = () => {
@@ -128,6 +132,7 @@ export default function MedicationsManagementPage() {
   // Submit new medication
   const handleCreateMedication = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeProfile) return;
     if (!name.trim() || !dosageStrength.trim()) {
       setErrorMessage("Medication name and dosage strength are required.");
       return;
@@ -141,7 +146,7 @@ export default function MedicationsManagementPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          healthcareProfileId: profileId,
+          healthcareProfileId: activeProfile.id,
           name: name.trim(),
           genericName: genericName.trim() || null,
           dosageStrength: dosageStrength.trim(),
@@ -232,74 +237,103 @@ export default function MedicationsManagementPage() {
     }
   };
 
-  // Demo fallback medications
-  const displayMeds: Medication[] =
-    medications.length > 0
-      ? medications
-      : [
-          {
-            id: "med-1",
-            healthcare_profile_id: "sample-profile-id",
-            name: "Telmisartan",
-            generic_name: "Telmisartan",
-            dosage_strength: "40 mg",
-            dosage_form: "TABLET",
-            instructions: "Take with water after breakfast",
-            prescribing_doctor: "Dr. Ramesh (Cardiologist)",
-            start_date: "2026-01-01",
-            end_date: null,
-            is_active: true,
-            schedules: [
-              {
-                id: "sched-1",
-                target_time: "08:30:00",
-                meal_timing: "AFTER_MEAL",
-                dose_quantity: 1,
-                frequency_type: "DAILY",
-                days_of_week: [0, 1, 2, 3, 4, 5, 6],
-              },
-            ],
-          },
-          {
-            id: "med-2",
-            healthcare_profile_id: "sample-profile-id",
-            name: "Metformin",
-            generic_name: "Metformin Hydrochloride",
-            dosage_strength: "500 mg",
-            dosage_form: "TABLET",
-            instructions: "Take with lunch and dinner",
-            prescribing_doctor: "Dr. Ramesh",
-            start_date: "2026-02-15",
-            end_date: null,
-            is_active: true,
-            schedules: [
-              {
-                id: "sched-2",
-                target_time: "13:30:00",
-                meal_timing: "WITH_MEAL",
-                dose_quantity: 1,
-                frequency_type: "DAILY",
-                days_of_week: [0, 1, 2, 3, 4, 5, 6],
-              },
-              {
-                id: "sched-3",
-                target_time: "20:30:00",
-                meal_timing: "WITH_MEAL",
-                dose_quantity: 1,
-                frequency_type: "DAILY",
-                days_of_week: [0, 1, 2, 3, 4, 5, 6],
-              },
-            ],
-          },
-        ];
+  // Fictional demo medications for explicit Demo Sandbox mode only
+  const FICTIONAL_DEMO_MEDS: Medication[] = [
+    {
+      id: "med-1",
+      healthcare_profile_id: "demo-profile-appaji",
+      name: "Telmisartan",
+      generic_name: "Telmisartan",
+      dosage_strength: "40 mg",
+      dosage_form: "TABLET",
+      instructions: "Take with water after breakfast",
+      prescribing_doctor: "Dr. Ramesh (Cardiologist)",
+      start_date: "2026-01-01",
+      end_date: null,
+      is_active: true,
+      schedules: [
+        {
+          id: "sched-1",
+          target_time: "08:30:00",
+          meal_timing: "AFTER_MEAL",
+          dose_quantity: 1,
+          frequency_type: "DAILY",
+          days_of_week: [0, 1, 2, 3, 4, 5, 6],
+        },
+      ],
+    },
+    {
+      id: "med-2",
+      healthcare_profile_id: "demo-profile-appaji",
+      name: "Metformin",
+      generic_name: "Metformin Hydrochloride",
+      dosage_strength: "500 mg",
+      dosage_form: "TABLET",
+      instructions: "Take with lunch and dinner",
+      prescribing_doctor: "Dr. Ramesh",
+      start_date: "2026-02-15",
+      end_date: null,
+      is_active: true,
+      schedules: [
+        {
+          id: "sched-2",
+          target_time: "13:30:00",
+          meal_timing: "WITH_MEAL",
+          dose_quantity: 1,
+          frequency_type: "DAILY",
+          days_of_week: [0, 1, 2, 3, 4, 5, 6],
+        },
+        {
+          id: "sched-3",
+          target_time: "20:30:00",
+          meal_timing: "WITH_MEAL",
+          dose_quantity: 1,
+          frequency_type: "DAILY",
+          days_of_week: [0, 1, 2, 3, 4, 5, 6],
+        },
+      ],
+    },
+  ];
 
-  if (loading) {
+  // Strictly isolate real authenticated users from fictional demo data
+  const displayMeds: Medication[] =
+    isDemo && medications.length === 0 ? FICTIONAL_DEMO_MEDS : medications;
+
+  if (loading || dashboardLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-8 h-8 animate-spin text-[#1E3A2F]" />
       </div>
     );
   }
+
+  if (!activeProfile && !isDemo) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center mx-auto shadow-xs">
+          <HeartHandshake className="w-9 h-9" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#1E3A2F]">
+            No Healthcare Profile Found
+          </h1>
+          <p className="text-sm text-[#5C6460]">
+            You have not linked or created any healthcare profiles yet. Create a profile to begin configuring medication schedules.
+          </p>
+        </div>
+        <div className="flex justify-center pt-2">
+          <Link
+            href="/onboard"
+            className="px-6 py-3 rounded-xl bg-[#1E3A2F] text-white font-bold text-sm hover:bg-[#162E25] shadow-xs"
+          >
+            Create Healthcare Profile
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const patientName = activeProfile?.displayName || "Healthcare";
 
   return (
     <div className="space-y-8">
@@ -310,7 +344,7 @@ export default function MedicationsManagementPage() {
             Medication Regimen &amp; Multi-Slot Schedules
           </span>
           <h1 className="mt-2 text-3xl font-extrabold text-[#1E3A2F]">
-            Prescriptions &amp; Schedules
+            {patientName}&apos;s Prescriptions &amp; Schedules
           </h1>
           <p className="text-sm text-[#5C6460]">
             Manage multi-dose daily timings, meal instructions, and active prescriptions.
@@ -328,6 +362,22 @@ export default function MedicationsManagementPage() {
 
       {/* Medication Cards List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {displayMeds.length === 0 && (
+          <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-[#EFECE6] space-y-4">
+            <Pill className="w-12 h-12 text-[#607B6E] mx-auto" />
+            <h3 className="text-lg font-black text-[#1E3A2F]">No Active Medications Configured</h3>
+            <p className="text-xs text-[#5C6460] max-w-sm mx-auto">
+              There are no medication routines scheduled for {patientName}. Add a prescription to generate daily dose occurrences.
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25] cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Medication Schedule</span>
+            </button>
+          </div>
+        )}
         {displayMeds.map((med) => (
           <div
             key={med.id}

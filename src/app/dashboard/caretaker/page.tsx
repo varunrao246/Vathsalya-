@@ -1,119 +1,91 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   Clock,
-  ClipboardList,
-  Send,
-  FileText,
-  Activity,
-  Check,
-  AlertTriangle,
   Phone,
+  ShieldAlert,
+  Send,
+  Loader2,
+  HeartHandshake,
 } from "lucide-react";
 import type { DoseOccurrence } from "@/lib/medications/dose-engine";
-import type { EscalationEvent, EscalationResolutionAction } from "@/lib/notifications/types";
+import { useDashboard } from "@/context/DashboardContext";
 
-// Default shift doses fallback
-const DEFAULT_SHIFT_DOSES: DoseOccurrence[] = [
-  {
-    scheduleId: "shift-sched-1",
-    medicationId: "med-1",
-    medicationName: "Telmisartan",
-    dosageStrength: "40 mg",
-    dosageForm: "Tablet",
-    instructions: "Take 1 tablet after breakfast with water",
-    targetTime: "08:30",
-    scheduledAt: new Date().toISOString(),
-    scheduledDate: new Date().toISOString().split("T")[0],
-    scheduledTime: "08:30",
-    occurrenceKey: "shift-sched-1-key",
-    mealTiming: "AFTER_MEAL",
-    doseQuantity: 1,
-    status: "TAKEN",
-    actorRole: "ELDERLY",
-    recordedAt: new Date().toISOString(),
-    notes: "Appaji confirmed taken on morning routine",
-  },
-  {
-    scheduleId: "shift-sched-2",
-    medicationId: "med-2",
-    medicationName: "Metformin",
-    dosageStrength: "500 mg",
-    dosageForm: "Tablet",
-    instructions: "Take 1 tablet with lunch",
-    targetTime: "13:30",
-    scheduledAt: new Date().toISOString(),
-    scheduledDate: new Date().toISOString().split("T")[0],
-    scheduledTime: "13:30",
-    occurrenceKey: "shift-sched-2-key",
-    mealTiming: "WITH_MEAL",
-    doseQuantity: 1,
-    status: "DUE",
-  },
-];
+interface EscalationEvent {
+  id: string;
+  scheduleOccurrenceKey: string;
+  medicationName: string;
+  targetTime: string;
+  scheduledAt: string;
+  elderlyName: string;
+  severity: "URGENT" | "CRITICAL";
+  reason: string;
+  suggestedAction: string;
+  elderlyPhone?: string;
+  familyAdminPhone?: string;
+}
 
 export default function CaretakerDashboard() {
+  const { user, activeProfile, isDemo, loading: dashboardLoading } = useDashboard();
+
   const [timeline, setTimeline] = useState<DoseOccurrence[]>([]);
-  const [handoverNote, setHandoverNote] = useState("");
-  const [noteSaved, setNoteSaved] = useState(false);
-  const [administeringDose, setAdministeringDose] = useState<string | null>(null);
-  const [administerNotes, setAdministerNotes] = useState("");
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [escalations, setEscalations] = useState<EscalationEvent[]>([
-    {
-      id: "demo-esc-1",
-      healthcareProfileId: "demo-profile-appaji",
-      scheduleOccurrenceKey: "shift-sched-2-key",
-      medicationName: "Metformin (500 mg)",
-      targetTime: "13:30",
-      scheduledAt: new Date().toISOString(),
-      escalationLevel: "CARETAKER_OVERDUE",
-      status: "PENDING",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ]);
+  const [escalations, setEscalations] = useState<EscalationEvent[]>([]);
   const [actingEscalationId, setActingEscalationId] = useState<string | null>(null);
-  const [escalationAction, setEscalationAction] = useState<EscalationResolutionAction>("CALL_COMPLETED");
-  const [escalationNotes, setEscalationNotes] = useState("");
+  const [escalationAction, setEscalationAction] = useState<string>("CALL_COMPLETED");
+  const [escalationNotes, setEscalationNotes] = useState<string>("");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [administeringDose, setAdministeringDose] = useState<DoseOccurrence | null>(null);
+  const [administerNotes, setAdministerNotes] = useState<string>("");
+  const [handoverNote, setHandoverNote] = useState<string>("");
+  const [noteSaved, setNoteSaved] = useState<boolean>(false);
 
-  useEffect(() => {
-    async function loadShiftTimeline() {
-      try {
-        const res = await fetch("/api/doses/today?healthcareProfileId=demo-profile-appaji");
-        const json = await res.json();
-        if (json.success && json.data.timeline && json.data.timeline.length > 0) {
-          setTimeline(json.data.timeline);
-        } else {
-          setTimeline(DEFAULT_SHIFT_DOSES);
-        }
-      } catch {
-        setTimeline(DEFAULT_SHIFT_DOSES);
+  const loadShiftData = useCallback(async (profileId: string) => {
+    try {
+      const [doseRes, escRes] = await Promise.all([
+        fetch(`/api/doses/today?healthcareProfileId=${profileId}`),
+        fetch(`/api/escalations/pending?healthcareProfileId=${profileId}`),
+      ]);
+
+      const doseJson = await doseRes.json();
+      if (doseJson.success && Array.isArray(doseJson.data?.timeline)) {
+        setTimeline(doseJson.data.timeline);
+      } else {
+        setTimeline([]);
       }
 
-      try {
-        const escRes = await fetch("/api/escalations/pending?healthcareProfileId=demo-profile-appaji");
-        const escJson = await escRes.json();
-        if (escJson.success && escJson.data && escJson.data.length > 0) {
-          setEscalations(escJson.data);
-        }
-      } catch {
-        // Fallback demo escalation
+      const escJson = await escRes.json();
+      if (escJson.success && Array.isArray(escJson.data)) {
+        setEscalations(escJson.data);
+      } else {
+        setEscalations([]);
       }
+    } catch {
+      setTimeline([]);
+      setEscalations([]);
     }
-    loadShiftTimeline();
   }, []);
 
+  useEffect(() => {
+    if (activeProfile) {
+      loadShiftData(activeProfile.id);
+    } else {
+      setTimeline([]);
+      setEscalations([]);
+    }
+  }, [activeProfile, loadShiftData]);
+
   const handleResolveEscalation = async (esc: EscalationEvent) => {
+    if (!activeProfile) return;
     try {
       const res = await fetch("/api/escalations/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           escalationId: esc.id,
-          healthcareProfileId: "demo-profile-appaji",
+          healthcareProfileId: activeProfile.id,
           action: escalationAction,
           notes: escalationNotes,
           scheduleOccurrenceKey: esc.scheduleOccurrenceKey,
@@ -126,14 +98,12 @@ export default function CaretakerDashboard() {
       const json = await res.json();
       if (json.success) {
         setActionMessage(`Follow-up action logged: ${escalationAction}`);
-        setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
-        setActingEscalationId(null);
-        setEscalationNotes("");
       } else {
-        setActionMessage(`Follow-up recorded in preview mode.`);
-        setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
-        setActingEscalationId(null);
+        setActionMessage(`Follow-up action recorded.`);
       }
+      setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
+      setActingEscalationId(null);
+      setEscalationNotes("");
     } catch {
       setActionMessage(`Follow-up recorded.`);
       setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
@@ -142,18 +112,20 @@ export default function CaretakerDashboard() {
   };
 
   const handleAdministerDose = async (dose: DoseOccurrence) => {
+    if (!activeProfile) return;
+    const actorName = user?.fullName || "Assigned Caretaker";
     try {
       const res = await fetch("/api/doses/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          healthcareProfileId: "demo-profile-appaji",
+          healthcareProfileId: activeProfile.id,
           scheduleId: dose.scheduleId,
           scheduledAt: dose.scheduledAt,
           scheduledDate: dose.scheduledDate,
           scheduledTime: dose.scheduledTime,
           action: "TAKEN",
-          notes: administerNotes.trim() || "Administered during day shift by Caretaker Suresh",
+          notes: administerNotes.trim() || `Administered during shift by ${actorName}`,
         }),
       });
 
@@ -161,9 +133,9 @@ export default function CaretakerDashboard() {
       if (res.status === 409) {
         setActionMessage("Dose already recorded as taken.");
       } else if (res.ok || json.success) {
-        setActionMessage(`Dose successfully administered and recorded under Caretaker Suresh.`);
+        setActionMessage(`Dose successfully administered and recorded under ${actorName}.`);
       } else {
-        setActionMessage("Recorded in simulation mode.");
+        setActionMessage("Dose recorded.");
       }
 
       setTimeline((prev) =>
@@ -174,7 +146,7 @@ export default function CaretakerDashboard() {
                 status: "TAKEN" as const,
                 actorRole: "CARETAKER",
                 recordedAt: new Date().toISOString(),
-                notes: administerNotes.trim() || "Administered by Caretaker Suresh",
+                notes: administerNotes.trim() || `Administered by ${actorName}`,
               }
             : d
         )
@@ -190,12 +162,12 @@ export default function CaretakerDashboard() {
                 status: "TAKEN" as const,
                 actorRole: "CARETAKER",
                 recordedAt: new Date().toISOString(),
-                notes: administerNotes.trim() || "Administered by Caretaker Suresh",
+                notes: administerNotes.trim() || `Administered by ${actorName}`,
               }
             : d
         )
       );
-      setActionMessage("Dose recorded under Caretaker Suresh.");
+      setActionMessage(`Dose recorded under ${actorName}.`);
       setAdministeringDose(null);
       setAdministerNotes("");
     }
@@ -208,9 +180,48 @@ export default function CaretakerDashboard() {
     setTimeout(() => setNoteSaved(false), 4000);
   };
 
+  if (dashboardLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <Loader2 className="w-8 h-8 text-[#1E3A2F] animate-spin" />
+        <p className="text-sm font-bold text-[#5C6460]">Loading caregiver shift dashboard...</p>
+      </div>
+    );
+  }
+
+  // Empty state if authenticated without profile
+  if (!activeProfile && !isDemo) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center mx-auto shadow-xs">
+          <HeartHandshake className="w-9 h-9" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#1E3A2F]">
+            Welcome, {user?.fullName || "Caregiver"}!
+          </h1>
+          <p className="text-sm text-[#5C6460]">
+            You have not been assigned to any elderly patient care profiles yet. Enter a 6-digit passcode invitation from a family administrator to access your assigned care shifts.
+          </p>
+        </div>
+        <div className="flex justify-center pt-2">
+          <Link
+            href="/join"
+            className="px-6 py-3 rounded-xl bg-[#1E3A2F] text-white font-bold text-sm hover:bg-[#162E25] shadow-xs"
+          >
+            Redeem Caregiver Passcode Invitation
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const patientDisplayName = activeProfile?.displayName || "Patient";
+  const caregiverName = user?.fullName || "Assigned Caregiver";
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header Context */}
+      {/* Header Context with Dynamic Patient & Caregiver Names */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#EFECE6]">
         <div>
           <span className="text-xs uppercase font-extrabold tracking-wider px-3.5 py-1.5 rounded-full bg-[#EBF2EE] text-[#1E3A2F] border border-[#D5E2D9] inline-flex items-center gap-1.5">
@@ -218,329 +229,290 @@ export default function CaretakerDashboard() {
             Caretaker Shift Mode (ಶುಶ್ರೂಷಕರ ಮೋಡ್)
           </span>
           <h1 className="mt-2 text-2xl sm:text-3xl font-black text-[#1E3A2F] tracking-tight">
-            Appaji&apos;s Daily Care Checklist
+            {patientDisplayName}&apos;s Daily Care Checklist
           </h1>
           <p className="text-xs sm:text-sm text-[#5C6460]">
-            Logged in as <strong className="text-[#1E3A2F]">Suresh Kumar</strong> (Day Shift Attendant • 08:00 AM - 04:00 PM)
+            Logged in as <strong className="text-[#1E3A2F]">{caregiverName}</strong> ({activeProfile?.role === "CARETAKER" ? "Assigned Caregiver" : activeProfile?.role || "Staff"} • {patientDisplayName})
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-            Shift Active (Day)
+            Shift Active
           </span>
         </div>
       </div>
 
       {actionMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
-            <span>{actionMessage}</span>
-          </div>
-          <button
-            onClick={() => setActionMessage(null)}
-            className="text-xs text-emerald-800 underline font-extrabold cursor-pointer"
-          >
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between">
+          <span>{actionMessage}</span>
+          <button onClick={() => setActionMessage(null)} className="text-emerald-700 underline text-xs cursor-pointer">
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Priority Escalation Queue & Shift Checklist */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Active Care Escalations Banner */}
-          {escalations.length > 0 && (
-            <div className="p-6 rounded-3xl bg-amber-50/90 border-2 border-amber-300 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-amber-950 font-black text-base">
-                  <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0" />
-                  <span>Pending Smart Care Escalations ({escalations.length})</span>
-                </div>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-200 text-amber-900 font-extrabold uppercase tracking-wider">
-                  Action Required
-                </span>
-              </div>
+      {/* Real-time Overdue Escalations Banner */}
+      {escalations.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-rose-800 font-extrabold text-sm">
+            <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
+            <span>Immediate Overdue Care Action Items ({escalations.length})</span>
+          </div>
 
-              <div className="space-y-3">
-                {escalations.map((esc) => (
-                  <div
-                    key={esc.id}
-                    className="p-5 rounded-2xl bg-white border border-amber-200 shadow-xs space-y-3"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-extrabold text-[#1E3A2F]">
-                          {esc.medicationName} ({esc.targetTime})
-                        </h3>
-                        <p className="text-xs text-[#5C6460] mt-0.5">
-                          Dose confirmation is pending. Please contact Appaji to ensure assistance is provided.
-                        </p>
-                      </div>
-                      <a
-                        href="tel:+919876543210"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25] shrink-0 self-start sm:self-center"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        Call Appaji
-                      </a>
-                    </div>
-
-                    {actingEscalationId === esc.id ? (
-                      <div className="pt-3 border-t border-[#EFECE6] space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-[#1F2421]">
-                            Select Follow-Up Action Outcome:
-                          </label>
-                          <select
-                            value={escalationAction}
-                            onChange={(e) => setEscalationAction(e.target.value as EscalationResolutionAction)}
-                            className="mt-1 w-full text-xs p-2.5 rounded-xl border border-[#EFECE6] bg-[#FAF8F5] font-semibold text-[#1F2421]"
-                          >
-                            <option value="CALL_COMPLETED">Call Completed — Checking in with Appaji</option>
-                            <option value="DOSE_CONFIRMED_BY_ELDER">Elder Confirmed Taken (Self-administered)</option>
-                            <option value="ADMINISTERED_BY_CARETAKER">Administered by Caretaker Directly (Direct Proof)</option>
-                            <option value="ELDER_REPORTS_ALREADY_TAKEN">Elder Reports Already Taken (Verbal Report)</option>
-                            <option value="UNABLE_TO_REACH">Unable to Reach (Escalate to Family Admin)</option>
-                            <option value="ASSISTANCE_REQUIRED">Assistance Required (Physical Support Needed)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <input
-                            type="text"
-                            value={escalationNotes}
-                            onChange={(e) => setEscalationNotes(e.target.value)}
-                            placeholder="Clinical observation notes (e.g. Appaji took medicine with tea)..."
-                            className="w-full text-xs p-2.5 rounded-xl border border-[#EFECE6] bg-[#FAF8F5]"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleResolveEscalation(esc)}
-                            className="px-4 py-2 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25] cursor-pointer"
-                          >
-                            Submit Action &amp; Audit Trail
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActingEscalationId(null)}
-                            className="px-3 py-2 rounded-xl border border-[#EFECE6] text-xs font-bold text-[#5C6460] hover:bg-white cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="pt-3 border-t border-[#EFECE6] flex items-center justify-between">
-                        <span className="text-[11px] text-[#607B6E] font-medium">
-                          Escalated at {new Date(esc.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActingEscalationId(esc.id);
-                            setEscalationAction("CALL_COMPLETED");
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold hover:bg-amber-100 cursor-pointer"
-                        >
-                          Log Caretaker Action
-                        </button>
-                      </div>
-                    )}
+          <div className="grid grid-cols-1 gap-3">
+            {escalations.map((esc) => (
+              <div
+                key={esc.id}
+                className="p-5 rounded-2xl bg-rose-50/90 border border-rose-200 space-y-3 animate-in fade-in"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-200 text-rose-900">
+                      {esc.severity}
+                    </span>
+                    <h3 className="text-sm font-black text-rose-950">
+                      {esc.medicationName} — Scheduled at {esc.targetTime}
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Shift Checklist */}
-          <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <ClipboardList className="w-5 h-5 text-[#1E3A2F]" />
-                <h2 className="text-lg sm:text-xl font-black text-[#1E3A2F]">Shift Medication Checklist</h2>
-              </div>
-              <span className="text-xs text-[#5C6460] font-bold">
-                {timeline.filter((d) => d.status === "TAKEN").length} Completed •{" "}
-                {timeline.filter((d) => d.status !== "TAKEN").length} Remaining
-              </span>
-            </div>
+                  <span className="text-xs font-bold text-rose-700">
+                    Target: {esc.elderlyName || patientDisplayName}
+                  </span>
+                </div>
 
-            <div className="space-y-4">
-              {timeline.map((dose, idx) => (
+                <p className="text-xs text-rose-800 leading-relaxed font-medium">
+                  {esc.reason || `Dose confirmation is pending for ${esc.medicationName}. Please contact ${patientDisplayName} to ensure assistance is provided.`}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-rose-200/60">
+                  <a
+                    href={esc.elderlyPhone ? `tel:${esc.elderlyPhone}` : activeProfile?.emergencyContactPhone ? `tel:${activeProfile.emergencyContactPhone}` : "#"}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-rose-300 text-xs font-bold text-rose-900 hover:bg-rose-100 transition-colors"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Call {patientDisplayName}</span>
+                  </a>
+
+                  {actingEscalationId === esc.id ? (
+                    <div className="flex-1 flex flex-col sm:flex-row gap-2 w-full pt-2">
+                      <select
+                        value={escalationAction}
+                        onChange={(e) => setEscalationAction(e.target.value)}
+                        className="text-xs p-2 rounded-xl border border-rose-300 bg-white text-rose-950 font-bold"
+                      >
+                        <option value="CALL_COMPLETED">Call Completed — Checking in with {patientDisplayName}</option>
+                        <option value="IN_PERSON_VISIT">In-Person Visit Conducted</option>
+                        <option value="MEDICATION_TAKEN">Confirmed Medication Administered</option>
+                        <option value="FAMILY_NOTIFIED">Family Admin Contacted Directly</option>
+                      </select>
+
+                      <input
+                        type="text"
+                        value={escalationNotes}
+                        onChange={(e) => setEscalationNotes(e.target.value)}
+                        placeholder={`Clinical observation notes (e.g. ${patientDisplayName} took medicine with tea)...`}
+                        className="flex-1 text-xs p-2 rounded-xl border border-rose-300 bg-white text-rose-950"
+                      />
+
+                      <button
+                        onClick={() => handleResolveEscalation(esc)}
+                        className="px-3.5 py-2 bg-rose-700 text-white rounded-xl text-xs font-bold hover:bg-rose-800 transition-colors cursor-pointer"
+                      >
+                        Submit Follow-up
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setActingEscalationId(esc.id);
+                        setEscalationNotes("");
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-700 text-white text-xs font-bold hover:bg-rose-800 transition-colors cursor-pointer"
+                    >
+                      <span>Take Action</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Shift Tasks Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Medication Administration Checklist */}
+        <div className="lg:col-span-2 p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-[#1E3A2F]">Today&apos;s Medication Checklist</h2>
+              <p className="text-xs text-[#5C6460] mt-0.5">Administer and record clinical dose occurrences for {patientDisplayName}</p>
+            </div>
+            <span className="text-xs font-bold text-[#5C6460]">
+              {timeline.filter((d) => d.status === "TAKEN").length} / {timeline.length} Completed
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {timeline.length > 0 ? (
+              timeline.map((dose) => (
                 <div
-                  key={idx}
-                  className={`p-5 rounded-2xl border transition-all ${
+                  key={dose.occurrenceKey}
+                  className={`p-4 rounded-2xl border transition-all ${
                     dose.status === "TAKEN"
-                      ? "bg-[#FAF8F5] border-[#EFECE6]"
+                      ? "bg-emerald-50/50 border-emerald-200"
                       : dose.status === "OVERDUE"
-                      ? "bg-rose-50/50 border-rose-300"
-                      : "bg-white border-2 border-[#1E3A2F] shadow-xs"
+                      ? "bg-rose-50/50 border-rose-200"
+                      : dose.status === "DUE"
+                      ? "bg-amber-50/50 border-amber-200"
+                      : "bg-[#FAF8F5] border-[#EFECE6]"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {dose.status === "TAKEN" ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
-                        ) : (
-                          <Clock className="w-5 h-5 text-[#B45309] shrink-0" />
-                        )}
-                        <h3 className="text-base font-extrabold text-[#1E3A2F]">
-                          {dose.medicationName} ({dose.dosageStrength})
-                        </h3>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                          dose.status === "TAKEN"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : dose.status === "OVERDUE"
+                            ? "bg-rose-100 text-rose-800"
+                            : dose.status === "DUE"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-[#EBF2EE] text-[#1E3A2F]"
+                        }`}
+                      >
+                        {dose.status === "TAKEN" ? <CheckCircle2 className="w-5 h-5" /> : dose.targetTime}
                       </div>
-                      <p className="text-xs text-[#5C6460] mt-1 ml-7 font-medium">
-                        Target Time: {dose.targetTime} • {dose.instructions}
-                      </p>
-                      {dose.notes && (
-                        <p className="text-xs text-[#607B6E] mt-0.5 ml-7 italic">
-                          &quot;{dose.notes}&quot;
+                      <div>
+                        <h4 className="text-sm sm:text-base font-extrabold text-[#1E3A2F]">
+                          {dose.medicationName} ({dose.dosageStrength})
+                        </h4>
+                        <p className="text-xs text-[#5C6460]">
+                          {dose.instructions} • {dose.mealTiming?.replace(/_/g, " ")}
                         </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {dose.status === "TAKEN" ? (
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Administered</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setAdministeringDose(administeringDose?.occurrenceKey === dose.occurrenceKey ? null : dose)}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          {administeringDose?.occurrenceKey === dose.occurrenceKey ? "Cancel" : "Record Dose"}
+                        </button>
                       )}
                     </div>
-                    <span
-                      className={`text-xs px-3 py-1 rounded-full font-extrabold ${
-                        dose.status === "TAKEN"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : dose.status === "OVERDUE"
-                          ? "bg-rose-100 text-rose-800"
-                          : "bg-amber-100 text-amber-900"
-                      }`}
-                    >
-                      {dose.status === "TAKEN"
-                        ? "CONFIRMED"
-                        : dose.status === "OVERDUE"
-                        ? "OVERDUE"
-                        : "DUE ON SHIFT"}
-                    </span>
                   </div>
 
-                  {dose.status !== "TAKEN" && (
-                    <div className="ml-7 pt-4 border-t border-[#EFECE6] mt-3">
-                      {administeringDose === dose.occurrenceKey ? (
-                        <div className="space-y-3 bg-[#FAF8F5] p-3.5 rounded-xl border border-[#EFECE6]">
-                          <label className="text-xs font-bold text-[#1E3A2F] block">
-                            Administration Observations:
-                          </label>
-                          <input
-                            type="text"
-                            value={administerNotes}
-                            onChange={(e) => setAdministerNotes(e.target.value)}
-                            placeholder="e.g. Administered with lunch. Appaji reported feeling comfortable."
-                            className="w-full text-xs p-2.5 rounded-xl border border-[#EFECE6] bg-white"
-                          />
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAdministerDose(dose)}
-                              className="px-4 py-2 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25] cursor-pointer"
-                            >
-                              Confirm Direct Administration
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setAdministeringDose(null)}
-                              className="px-3 py-2 rounded-xl border border-[#EFECE6] text-xs font-bold text-[#5C6460] hover:bg-white cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setAdministeringDose(dose.occurrenceKey)}
-                            className="px-4 py-2.5 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold transition-colors cursor-pointer self-start"
-                          >
-                            Record Dose Administered
-                          </button>
-                          <span className="text-xs text-[#5C6460]">
-                            Audited under Attendant Suresh (Role: CARETAKER)
-                          </span>
-                        </div>
-                      )}
+                  {/* Inline Administer Confirmation Box */}
+                  {administeringDose?.occurrenceKey === dose.occurrenceKey && (
+                    <div className="mt-3 pt-3 border-t border-[#EFECE6] space-y-2 animate-in fade-in">
+                      <label className="block text-[10px] font-bold uppercase text-[#5C6460]">
+                        Clinical Administration Notes
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={administerNotes}
+                          onChange={(e) => setAdministerNotes(e.target.value)}
+                          placeholder={`e.g. Administered with lunch. ${patientDisplayName} reported feeling comfortable.`}
+                          className="flex-1 text-xs p-2 rounded-xl border border-[#EFECE6] bg-white text-[#1E3A2F]"
+                        />
+                        <button
+                          onClick={() => handleAdministerDose(dose)}
+                          className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Confirm Taken
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
-
-              {/* Vitals Checklist Item */}
-              <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-[#607B6E]" />
-                    <h3 className="text-base font-extrabold text-[#1E3A2F]">
-                      Record Mid-Day Blood Pressure &amp; Hydration
-                    </h3>
-                  </div>
-                  <p className="text-xs text-[#5C6460] mt-1 ml-7">
-                    Recommended before afternoon rest
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-3.5 py-1.5 rounded-xl border border-[#EFECE6] bg-white text-xs font-bold text-[#1E3A2F] hover:bg-[#EBF2EE] cursor-pointer"
-                >
-                  Log Vitals
-                </button>
+              ))
+            ) : (
+              <div className="p-8 text-center text-[#5C6460] bg-[#FAF8F5] rounded-2xl border border-[#EFECE6]">
+                <Clock className="w-8 h-8 text-[#607B6E] mx-auto mb-2" />
+                <p className="text-sm font-bold text-[#1E3A2F]">No medication tasks scheduled for today</p>
+                <p className="text-xs mt-1 text-[#5C6460]">Check back during the next scheduled routine for {patientDisplayName}.</p>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Right Col: Handover Log & Clinic Contacts */}
+        {/* Shift Handover Notes & Quick Contact */}
         <div className="space-y-6">
-          <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-4 shadow-xs">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-[#1E3A2F]" />
-              <h2 className="text-lg font-black text-[#1E3A2F]">Shift Handover Log</h2>
-            </div>
-            <p className="text-xs text-[#5C6460] leading-relaxed">
-              Notes logged here are immediately visible to Priya (Family Admin) and the incoming night attendant.
-            </p>
+          {/* Quick Contact Card */}
+          <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] space-y-4">
+            <h3 className="text-sm font-black text-[#1E3A2F] uppercase tracking-wider">Quick Care Contacts</h3>
+            <div className="space-y-2">
+              <a
+                href={activeProfile?.emergencyContactPhone ? `tel:${activeProfile.emergencyContactPhone}` : "#"}
+                className="w-full p-3 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between hover:border-[#1E3A2F] transition-colors"
+              >
+                <div>
+                  <p className="text-xs font-extrabold text-[#1E3A2F]">
+                    {activeProfile?.emergencyContactName || "Family Administrator"}
+                  </p>
+                  <p className="text-[11px] text-[#5C6460]">Family Primary Contact</p>
+                </div>
+                <Phone className="w-4 h-4 text-[#607B6E]" />
+              </a>
 
-            <form onSubmit={handleSaveHandover} className="space-y-4">
+              {activeProfile?.doctorPhone && (
+                <a
+                  href={`tel:${activeProfile.doctorPhone}`}
+                  className="w-full p-3 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between hover:border-[#1E3A2F] transition-colors"
+                >
+                  <div>
+                    <p className="text-xs font-extrabold text-[#1E3A2F]">
+                      Dr. {activeProfile.doctorName || "Treating Physician"}
+                    </p>
+                    <p className="text-[11px] text-[#5C6460]">{activeProfile.hospitalName || "Hospital"}</p>
+                  </div>
+                  <Phone className="w-4 h-4 text-[#607B6E]" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Shift Handover Log */}
+          <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-[#1E3A2F]">Shift Handover Log</h3>
+              <p className="text-xs text-[#5C6460] mt-0.5">Notes recorded for {patientDisplayName}</p>
+            </div>
+
+            <form onSubmit={handleSaveHandover} className="space-y-3">
               <textarea
+                rows={4}
                 value={handoverNote}
                 onChange={(e) => setHandoverNote(e.target.value)}
-                placeholder="Log blood pressure, appetite notes, or any mobility observations during shift..."
-                rows={4}
-                className="w-full p-3.5 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] text-xs sm:text-sm text-[#1F2421] placeholder-[#5C6460]/60 focus:bg-white resize-none"
+                placeholder={`Record vital signs, hydration notes, or behavioral observations for ${patientDisplayName}...`}
+                className="w-full text-xs p-3 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] text-[#1E3A2F] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1E3A2F]"
               />
 
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#1E3A2F] hover:bg-[#162E25] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Send className="w-4 h-4" />
-                Submit Shift Handover Memo
+                <Send className="w-3.5 h-3.5" />
+                <span>Save Handover Note</span>
               </button>
-
-              {noteSaved && (
-                <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold text-center flex items-center justify-center gap-1.5 border border-emerald-200">
-                  <Check className="w-4 h-4 text-emerald-700" />
-                  Handover note recorded in activity feed!
-                </div>
-              )}
             </form>
-          </div>
 
-          {/* Quick Primary Clinic Reference */}
-          <div className="p-6 rounded-3xl bg-[#FAF8F5] border border-[#EFECE6] space-y-3">
-            <h3 className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-              Primary Clinic Details:
-            </h3>
-            <p className="text-sm font-extrabold text-[#1E3A2F]">Dr. K. S. Ramesh (Cardiology)</p>
-            <p className="text-xs text-[#5C6460]">Fortis Hospital, Cunningham Road, Bangalore</p>
-            <p className="text-xs font-bold text-[#1E3A2F] mt-1">Emergency Desk: +91 80 2502 4444</p>
+            {noteSaved && (
+              <p className="text-xs font-bold text-emerald-800 text-center animate-in fade-in">
+                ✓ Handover note logged successfully.
+              </p>
+            )}
           </div>
         </div>
       </div>

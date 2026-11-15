@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -11,15 +11,14 @@ import {
   Pill,
   Calendar,
   ChevronRight,
-  TrendingUp,
-  Send,
-  Mail,
   RefreshCw,
   Plus,
   Activity,
-  UserCheck,
+  HeartHandshake,
+  Loader2,
 } from "lucide-react";
 import type { DoseOccurrence } from "@/lib/medications/dose-engine";
+import { useDashboard, formatUserBadge } from "@/context/DashboardContext";
 
 interface CareSummaryData {
   summaryText: string;
@@ -52,8 +51,10 @@ interface CareActivityItem {
 }
 
 export default function FamilyDashboard() {
+  const { user, activeProfile, isDemo, loading: dashboardLoading } = useDashboard();
+
   const [timeline, setTimeline] = useState<DoseOccurrence[]>([]);
-  const [adherence, setAdherence] = useState({ total: 3, taken: 1, percent: 94 });
+  const [adherence, setAdherence] = useState({ total: 0, taken: 0, percent: 100 });
   const [careSummary, setCareSummary] = useState<CareSummaryData | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
@@ -64,116 +65,109 @@ export default function FamilyDashboard() {
   const [apptClinic, setApptClinic] = useState("");
   const [apptTime, setApptTime] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
 
-  // Load baseline medication timeline
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetch("/api/doses/today?healthcareProfileId=demo-profile-appaji");
-        const json = await res.json();
-        if (json.success && json.data.timeline) {
-          setTimeline(json.data.timeline);
-          if (json.data.summary) {
-            setAdherence({
-              total: json.data.summary.total,
-              taken: json.data.summary.taken,
-              percent: json.data.summary.adherencePercentage,
-            });
-          }
+  // Load baseline medication timeline for the active profile
+  const loadMedicationTimeline = useCallback(async (profileId: string) => {
+    try {
+      const res = await fetch(`/api/doses/today?healthcareProfileId=${profileId}`);
+      const json = await res.json();
+      if (json.success && json.data?.timeline) {
+        setTimeline(json.data.timeline);
+        if (json.data.summary) {
+          setAdherence({
+            total: json.data.summary.total,
+            taken: json.data.summary.taken,
+            percent: json.data.summary.adherencePercentage,
+          });
         }
-      } catch {
-        // Fallback default timeline
+      } else {
+        setTimeline([]);
+        setAdherence({ total: 0, taken: 0, percent: 100 });
       }
+    } catch {
+      setTimeline([]);
     }
-    loadData();
   }, []);
 
   // Load AI Care Summary
-  const refreshCareSummary = async () => {
+  const refreshCareSummary = useCallback(async () => {
+    if (!activeProfile) return;
     setLoadingSummary(true);
     try {
-      const res = await fetch("/api/care-insights?healthcareProfileId=demo-profile-appaji&forceRefresh=true");
+      const res = await fetch(`/api/care-insights?healthcareProfileId=${activeProfile.id}&forceRefresh=true`);
       const json = await res.json();
       if (json.success && json.data) {
         setCareSummary(json.data);
       }
     } catch {
-      // Fallback preserved
+      //
     } finally {
       setLoadingSummary(false);
     }
-  };
-
-  useEffect(() => {
-    let ignore = false;
-    async function fetchSummary() {
-      try {
-        const res = await fetch("/api/care-insights?healthcareProfileId=demo-profile-appaji");
-        const json = await res.json();
-        if (!ignore && json.success && json.data) {
-          setCareSummary(json.data);
-        }
-      } catch {
-        // Fallback
-      }
-    }
-    fetchSummary();
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  }, [activeProfile]);
 
   // Load Upcoming Appointments
-  const refreshAppointments = async () => {
+  const loadAppointments = useCallback(async (profileId: string) => {
     try {
-      const res = await fetch("/api/appointments?healthcareProfileId=demo-profile-appaji&type=upcoming");
+      const res = await fetch(`/api/appointments?healthcareProfileId=${profileId}&type=upcoming`);
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && Array.isArray(json.data)) {
         setAppointments(json.data);
+      } else {
+        setAppointments([]);
       }
     } catch {
-      // Fallback
+      setAppointments([]);
     }
-  };
-
-  useEffect(() => {
-    let ignore = false;
-    async function fetchAppointments() {
-      try {
-        const res = await fetch("/api/appointments?healthcareProfileId=demo-profile-appaji&type=upcoming");
-        const json = await res.json();
-        if (!ignore && json.success && json.data) {
-          setAppointments(json.data);
-        }
-      } catch {
-        // Fallback
-      }
-    }
-    fetchAppointments();
-    return () => {
-      ignore = true;
-    };
   }, []);
 
   // Load Care Activities
-  useEffect(() => {
-    async function loadActivities() {
-      try {
-        const res = await fetch("/api/care-activities?healthcareProfileId=demo-profile-appaji&limit=8");
-        const json = await res.json();
-        if (json.success && json.data) {
-          setActivities(json.data);
-        }
-      } catch {
-        // Fallback
+  const loadActivities = useCallback(async (profileId: string) => {
+    try {
+      const res = await fetch(`/api/care-activities?healthcareProfileId=${profileId}&limit=8`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setActivities(json.data);
+      } else {
+        setActivities([]);
       }
+    } catch {
+      setActivities([]);
     }
-    loadActivities();
   }, []);
+
+  // Fetch all profile-dependent data whenever the active profile changes
+  useEffect(() => {
+    if (!activeProfile) {
+      setTimeline([]);
+      setCareSummary(null);
+      setAppointments([]);
+      setActivities([]);
+      return;
+    }
+
+    setLoadingData(true);
+    Promise.all([
+      loadMedicationTimeline(activeProfile.id),
+      loadAppointments(activeProfile.id),
+      loadActivities(activeProfile.id),
+      fetch(`/api/care-insights?healthcareProfileId=${activeProfile.id}`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.success && json.data) {
+            setCareSummary(json.data);
+          }
+        })
+        .catch(() => {}),
+    ]).finally(() => {
+      setLoadingData(false);
+    });
+  }, [activeProfile, loadMedicationTimeline, loadAppointments, loadActivities]);
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apptDoctor || !apptSpecialty || !apptClinic || !apptTime) return;
+    if (!activeProfile || !apptDoctor || !apptSpecialty || !apptClinic || !apptTime) return;
 
     setSubmittingAppt(true);
     try {
@@ -181,11 +175,11 @@ export default function FamilyDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          healthcareProfileId: "demo-profile-appaji",
-          doctorName: apptDoctor,
-          specialty: apptSpecialty,
-          clinicName: apptClinic,
-          locationOrLink: apptClinic,
+          healthcareProfileId: activeProfile.id,
+          doctorName: apptDoctor.trim(),
+          specialty: apptSpecialty.trim(),
+          clinicName: apptClinic.trim(),
+          locationOrLink: apptClinic.trim(),
           appointmentTime: new Date(apptTime).toISOString(),
         }),
       });
@@ -196,7 +190,7 @@ export default function FamilyDashboard() {
         setApptSpecialty("");
         setApptClinic("");
         setApptTime("");
-        refreshAppointments();
+        loadAppointments(activeProfile.id);
       }
     } catch {
       //
@@ -205,9 +199,65 @@ export default function FamilyDashboard() {
     }
   };
 
+  // 1. Loading state
+  if (dashboardLoading || (loadingData && !activeProfile)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <Loader2 className="w-8 h-8 text-[#1E3A2F] animate-spin" />
+        <p className="text-sm font-bold text-[#5C6460]">Loading your healthcare dashboard...</p>
+      </div>
+    );
+  }
+
+  // 2. Empty State: Authenticated user without any healthcare profiles
+  if (!activeProfile && !isDemo) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center mx-auto shadow-xs">
+          <HeartHandshake className="w-9 h-9" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#1E3A2F]">
+            Welcome, {user?.fullName || "Family Caregiver"}!
+          </h1>
+          <p className="text-sm text-[#5C6460] max-w-lg mx-auto">
+            You do not have any healthcare profiles linked to your account yet. Create your first profile to begin managing medications, appointments, and proactive care for your loved one.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto pt-4 text-left">
+          <Link
+            href="/onboard"
+            className="p-5 rounded-2xl bg-white border border-[#EFECE6] hover:border-[#1E3A2F] shadow-xs hover:shadow-sm transition-all group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-[#1E3A2F] text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <Plus className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-extrabold text-[#1E3A2F]">Create Healthcare Profile</h3>
+            <p className="text-xs text-[#5C6460] mt-1">Set up a clinical profile for an elderly parent or family member.</p>
+          </Link>
+
+          <Link
+            href="/join"
+            className="p-5 rounded-2xl bg-white border border-[#EFECE6] hover:border-[#1E3A2F] shadow-xs hover:shadow-sm transition-all group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] text-[#1E3A2F] border border-[#EFECE6] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <UserPlus className="w-5 h-5 text-[#607B6E]" />
+            </div>
+            <h3 className="text-sm font-extrabold text-[#1E3A2F]">Redeem Passcode</h3>
+            <p className="text-xs text-[#5C6460] mt-1">Join an existing family profile with a 6-digit access code.</p>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const patientName = activeProfile?.displayName || "Healthcare";
+  const userRoleString = formatUserBadge(user?.fullName || "Your Account", activeProfile?.relationship, activeProfile?.role);
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header Context */}
+      {/* Header Context with Dynamic Patient & User Names */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#EFECE6]">
         <div>
           <span className="text-xs uppercase font-extrabold tracking-wider px-3.5 py-1.5 rounded-full bg-[#EBF2EE] text-[#1E3A2F] border border-[#D5E2D9] inline-flex items-center gap-1.5">
@@ -215,10 +265,10 @@ export default function FamilyDashboard() {
             Family Member Overview Mode
           </span>
           <h1 className="mt-2 text-2xl sm:text-3xl font-black text-[#1E3A2F] tracking-tight">
-            Appaji&apos;s Healthcare Overview
+            {patientName}&apos;s Healthcare Overview
           </h1>
           <p className="text-xs sm:text-sm text-[#5C6460]">
-            Logged in as <strong className="text-[#1E3A2F]">Priya Sharma</strong> (Daughter &amp; Healthcare Administrator)
+            Logged in as <strong className="text-[#1E3A2F]">{userRoleString}</strong>
           </p>
         </div>
 
@@ -247,95 +297,63 @@ export default function FamilyDashboard() {
             <CheckCircle2 className="w-5 h-5 text-emerald-700" />
           </div>
           <div>
-            <h2 className="text-sm font-black text-emerald-950">Appaji is on schedule today</h2>
-            <p className="text-xs text-emerald-800 mt-0.5">Morning dose was confirmed on time. Attendant Ramesh is on duty.</p>
+            <h2 className="text-sm font-black text-emerald-950">
+              {patientName} Care Status
+            </h2>
+            <p className="text-xs text-emerald-800 mt-0.5">
+              {timeline.some((d) => d.status === "TAKEN")
+                ? "Doses for today are actively tracked and confirmed on schedule."
+                : "Active medication and daily appointment schedules are synchronized."}
+            </p>
           </div>
         </div>
         <span className="text-xs font-bold text-emerald-900 bg-white px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-center">
-          Zero Overdue Alerts
+          {adherence.total > 0 ? `${adherence.percent}% Adherence` : "Active Profile"}
         </span>
       </div>
 
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-                7-Day Adherence
-              </span>
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-4xl font-black text-[#1E3A2F]">{adherence.percent}%</span>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                +2% vs last week
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-[#5C6460]">
-              Consistently taking morning blood pressure dose on time.
-            </p>
+        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-[#5C6460]">
+            <span className="text-xs font-bold uppercase tracking-wider">Today&apos;s Adherence</span>
+            <Activity className="w-4 h-4 text-[#607B6E]" />
           </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-[#1E3A2F]">{adherence.percent}%</span>
+            <span className="text-xs text-[#5C6460]">({adherence.taken}/{adherence.total} Doses)</span>
+          </div>
+          <p className="text-xs text-[#5C6460]">
+            {adherence.total > 0 ? "Evaluated in profile timezone" : "No scheduled doses today"}
+          </p>
         </div>
 
-        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-                Today&apos;s Doses
-              </span>
-              <Clock className="w-4 h-4 text-[#607B6E]" />
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-4xl font-black text-[#1E3A2F]">
-                {adherence.taken} of {adherence.total}
-              </span>
-              <span className="text-xs font-bold text-[#607B6E]">Confirmed</span>
-            </div>
-            <p className="mt-2 text-xs text-[#5C6460]">
-              Next: Metformin (500 mg) at 01:30 PM (With Lunch).
-            </p>
+        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-[#5C6460]">
+            <span className="text-xs font-bold uppercase tracking-wider">Scheduled Today</span>
+            <Pill className="w-4 h-4 text-[#607B6E]" />
           </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-[#1E3A2F]">{timeline.length}</span>
+            <span className="text-xs text-[#5C6460]">Occurrences</span>
+          </div>
+          <p className="text-xs text-[#5C6460]">
+            {timeline.filter((d) => d.status === "DUE").length} Due Now • {timeline.filter((d) => d.status === "UPCOMING").length} Upcoming
+          </p>
         </div>
 
-        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-                Upcoming Doctor Visit
-              </span>
-              <Calendar className="w-4 h-4 text-[#607B6E]" />
-            </div>
-            {appointments.length > 0 ? (
-              <div className="mt-3">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-black text-[#1E3A2F]">
-                    {new Date(appointments[0].appointment_time).toLocaleDateString("en-IN", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                  <span className="text-xs font-bold text-[#5C6460]">
-                    {new Date(appointments[0].appointment_time).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-[#5C6460]">
-                  {appointments[0].doctor_name} ({appointments[0].specialty}) at {appointments[0].clinic_name}
-                </p>
-              </div>
-            ) : (
-              <div className="mt-3">
-                <span className="text-lg font-black text-[#1E3A2F]">Wednesday 10:30 AM</span>
-                <p className="mt-1 text-xs text-[#5C6460]">
-                  Dr. K. S. Ramesh (Cardiology, Fortis Hospital).
-                </p>
-              </div>
-            )}
+        <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-[#5C6460]">
+            <span className="text-xs font-bold uppercase tracking-wider">Care Appointments</span>
+            <Calendar className="w-4 h-4 text-[#607B6E]" />
           </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-[#1E3A2F]">{appointments.length}</span>
+            <span className="text-xs text-[#5C6460]">Upcoming</span>
+          </div>
+          <p className="text-xs text-[#5C6460]">
+            {appointments.length > 0 ? `Next: Dr. ${appointments[0].doctor_name}` : "No pending visits"}
+          </p>
         </div>
       </div>
 
@@ -357,22 +375,22 @@ export default function FamilyDashboard() {
             <button
               onClick={refreshCareSummary}
               disabled={loadingSummary}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-xs font-bold text-[#1E3A2F] border border-[#D5E2D9] hover:bg-[#FAF8F5] transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-xs font-bold text-[#1E3A2F] border border-[#D5E2D9] hover:bg-[#FAF8F5] transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#607B6E] ${loadingSummary ? "animate-spin" : ""}`} />
               <span>{loadingSummary ? "Synthesizing..." : "Refresh Summary"}</span>
             </button>
             <span className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full bg-white text-[#1E3A2F] border border-[#D5E2D9]">
-              {careSummary?.status === "CRITICAL_ACTION_REQUIRED"
-                ? "Attention Needed"
-                : "All Stable"}
+              {careSummary?.status === "CRITICAL_ACTION_REQUIRED" ? "Attention Needed" : "All Stable"}
             </span>
           </div>
         </div>
 
         <p className="text-sm sm:text-base text-[#1E3A2F] leading-relaxed font-medium">
           {careSummary?.summaryText ||
-            "Appaji is maintaining excellent consistency today. Morning blood pressure medication was confirmed promptly. Attendant Ramesh is on duty for the afternoon shift. All upcoming care appointments and medication routines remain fully on schedule."}
+            (isDemo
+              ? "Appaji is maintaining excellent consistency today. Morning blood pressure medication was confirmed promptly. Attendant Ramesh is on duty for the afternoon shift. All upcoming care appointments and medication routines remain fully on schedule."
+              : `Clinical care summary for ${patientName} is synchronized with confirmed occurrences. All upcoming care appointments and medication routines remain fully on schedule.`)}
         </p>
 
         {careSummary?.keyObservations && careSummary.keyObservations.length > 0 && (
@@ -410,7 +428,7 @@ export default function FamilyDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg sm:text-xl font-black text-[#1E3A2F]">Today&apos;s Medication Timeline</h2>
-              <p className="text-xs text-[#5C6460] mt-0.5">Evaluated deterministically in profile timezone</p>
+              <p className="text-xs text-[#5C6460] mt-0.5">Evaluated deterministically in profile timezone ({activeProfile?.timezone || "Asia/Kolkata"})</p>
             </div>
             <Link
               href="/dashboard/medications"
@@ -428,11 +446,11 @@ export default function FamilyDashboard() {
                   key={idx}
                   className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
                     dose.status === "TAKEN"
-                      ? "bg-[#FAF8F5] border-[#EFECE6]"
-                      : dose.status === "DUE"
-                      ? "bg-amber-50/50 border-amber-300"
+                      ? "bg-emerald-50/50 border-emerald-200"
                       : dose.status === "OVERDUE"
-                      ? "bg-rose-50/50 border-rose-300"
+                      ? "bg-rose-50/50 border-rose-200"
+                      : dose.status === "DUE"
+                      ? "bg-amber-50/50 border-amber-200"
                       : "bg-[#FAF8F5] border-[#EFECE6]"
                   }`}
                 >
@@ -467,7 +485,7 @@ export default function FamilyDashboard() {
                   <div>
                     {dose.status === "TAKEN" ? (
                       <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 font-extrabold border border-emerald-200">
-                        Taken {dose.actorRole === "CARETAKER" ? "(Caretaker Suresh)" : "(Appaji)"}
+                        Taken {dose.actorRole ? `(${dose.actorRole})` : `(${patientName})`}
                       </span>
                     ) : dose.status === "OVERDUE" ? (
                       <span className="text-xs px-3 py-1 rounded-full bg-rose-50 text-rose-800 font-extrabold border border-rose-200 animate-pulse">
@@ -488,8 +506,17 @@ export default function FamilyDashboard() {
             ) : (
               <div className="p-8 text-center text-[#5C6460] bg-[#FAF8F5] rounded-2xl border border-[#EFECE6]">
                 <Pill className="w-8 h-8 text-[#607B6E] mx-auto mb-2" />
-                <p className="text-sm font-bold text-[#1E3A2F]">No medication occurrences evaluated yet</p>
-                <p className="text-xs mt-1">Configure active medication schedules to generate daily occurrences.</p>
+                <p className="text-sm font-bold text-[#1E3A2F]">No medication occurrences scheduled for today</p>
+                <p className="text-xs mt-1 text-[#5C6460]">
+                  Configure medication schedules for {patientName} to track daily doses.
+                </p>
+                <Link
+                  href="/dashboard/medications"
+                  className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25] transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Schedule</span>
+                </Link>
               </div>
             )}
           </div>
@@ -498,157 +525,151 @@ export default function FamilyDashboard() {
         {/* Clinical Appointments & Schedule Form */}
         <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black text-[#1E3A2F]">Clinical Visits</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-black text-[#1E3A2F]">Upcoming Appointments</h2>
+                <p className="text-xs text-[#5C6460]">Doctor checkups &amp; diagnostics</p>
+              </div>
               <button
                 onClick={() => setShowAddAppt(!showAddAppt)}
-                className="text-xs font-bold text-[#1E3A2F] hover:text-[#162E25] flex items-center gap-1 bg-[#EBF2EE] px-2.5 py-1 rounded-lg border border-[#D5E2D9]"
+                className="p-1.5 rounded-lg border border-[#EFECE6] bg-[#FAF8F5] hover:bg-white text-[#1E3A2F] transition-colors cursor-pointer"
+                title="Schedule Appointment"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{showAddAppt ? "Close" : "Schedule"}</span>
+                <Plus className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Quick Add Form Modal/Drawer */}
             {showAddAppt && (
-              <form onSubmit={handleCreateAppointment} className="mt-4 p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] space-y-3">
-                <p className="text-xs font-bold text-[#1E3A2F]">New Doctor Appointment</p>
-                <input
-                  type="text"
-                  placeholder="Doctor Name (e.g. Dr. Ananth Kumar)"
-                  value={apptDoctor}
-                  onChange={(e) => setApptDoctor(e.target.value)}
-                  className="w-full text-xs p-2 rounded-xl border border-[#D5E2D9] bg-white text-[#1E3A2F]"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Specialty (e.g. Cardiology, Orthopedics)"
-                  value={apptSpecialty}
-                  onChange={(e) => setApptSpecialty(e.target.value)}
-                  className="w-full text-xs p-2 rounded-xl border border-[#D5E2D9] bg-white text-[#1E3A2F]"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Hospital / Clinic (e.g. Manipal Hospital)"
-                  value={apptClinic}
-                  onChange={(e) => setApptClinic(e.target.value)}
-                  className="w-full text-xs p-2 rounded-xl border border-[#D5E2D9] bg-white text-[#1E3A2F]"
-                  required
-                />
-                <input
-                  type="datetime-local"
-                  value={apptTime}
-                  onChange={(e) => setApptTime(e.target.value)}
-                  className="w-full text-xs p-2 rounded-xl border border-[#D5E2D9] bg-white text-[#1E3A2F]"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={submittingAppt}
-                  className="w-full py-2 bg-[#1E3A2F] text-white text-xs font-bold rounded-xl hover:bg-[#162E25] disabled:opacity-50"
-                >
-                  {submittingAppt ? "Saving..." : "Save Appointment"}
-                </button>
+              <form onSubmit={handleCreateAppointment} className="mb-4 p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] space-y-3">
+                <h4 className="text-xs font-black text-[#1E3A2F]">Schedule Doctor Appointment</h4>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[#5C6460] mb-1">Doctor Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={apptDoctor}
+                    onChange={(e) => setApptDoctor(e.target.value)}
+                    placeholder="e.g. Dr. Ramesh"
+                    className="w-full text-xs p-2 rounded-lg border border-[#EFECE6] bg-white text-[#1E3A2F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[#5C6460] mb-1">Specialty</label>
+                  <input
+                    type="text"
+                    required
+                    value={apptSpecialty}
+                    onChange={(e) => setApptSpecialty(e.target.value)}
+                    placeholder="e.g. Geriatric Cardiology"
+                    className="w-full text-xs p-2 rounded-lg border border-[#EFECE6] bg-white text-[#1E3A2F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[#5C6460] mb-1">Clinic / Hospital</label>
+                  <input
+                    type="text"
+                    required
+                    value={apptClinic}
+                    onChange={(e) => setApptClinic(e.target.value)}
+                    placeholder="e.g. Manipal Hospital, Bangalore"
+                    className="w-full text-xs p-2 rounded-lg border border-[#EFECE6] bg-white text-[#1E3A2F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-[#5C6460] mb-1">Date &amp; Time</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={apptTime}
+                    onChange={(e) => setApptTime(e.target.value)}
+                    className="w-full text-xs p-2 rounded-lg border border-[#EFECE6] bg-white text-[#1E3A2F]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={submittingAppt}
+                    className="flex-1 py-1.5 bg-[#1E3A2F] text-white rounded-lg text-xs font-bold hover:bg-[#162E25] disabled:opacity-50 cursor-pointer"
+                  >
+                    {submittingAppt ? "Saving..." : "Save Appointment"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAppt(false)}
+                    className="px-3 py-1.5 border border-[#EFECE6] bg-white rounded-lg text-xs font-bold text-[#5C6460] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </form>
             )}
 
-            <div className="space-y-3 mt-4">
+            <div className="space-y-3">
               {appointments.length > 0 ? (
-                appointments.map((a) => (
-                  <div key={a.id} className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] space-y-1">
+                appointments.map((appt) => (
+                  <div key={appt.id} className="p-3.5 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-extrabold text-[#1E3A2F]">{a.doctor_name}</p>
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        {a.status}
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[#1E3A2F]">
+                        {appt.specialty}
+                      </span>
+                      <span className="text-xs text-[#5C6460] font-medium">
+                        {new Date(appt.appointment_time).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                        })}
                       </span>
                     </div>
-                    <p className="text-[11px] text-[#5C6460]">{a.specialty} • {a.clinic_name}</p>
-                    <p className="text-[11px] text-[#1E3A2F] font-bold">
-                      {new Date(a.appointment_time).toLocaleString("en-IN", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </p>
+                    <h4 className="text-xs font-black text-[#1E3A2F]">Dr. {appt.doctor_name}</h4>
+                    <p className="text-[11px] text-[#5C6460]">{appt.clinic_name}</p>
                   </div>
                 ))
               ) : (
-                <div className="p-4 text-center text-xs text-[#5C6460] bg-[#FAF8F5] rounded-xl border border-[#EFECE6]">
-                  No upcoming clinical visits scheduled. Click &quot;Schedule&quot; above to add one.
+                <div className="p-6 text-center text-[#5C6460] bg-[#FAF8F5] rounded-2xl border border-[#EFECE6]">
+                  <Calendar className="w-6 h-6 text-[#607B6E] mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-[#1E3A2F]">No upcoming appointments</p>
+                  <p className="text-[11px] mt-0.5">Click + above to log a clinical visit.</p>
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-[#EFECE6] space-y-2">
-            <h3 className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-              Connected Healthcare Circle
-            </h3>
-            <div className="text-xs text-[#5C6460] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Send className="w-3.5 h-3.5 text-[#607B6E]" />
-                  Telegram Bot:
-                </span>
-                <span className="font-bold text-emerald-700">@VatsalyaCareBot</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-[#607B6E]" />
-                  Email Alerts:
-                </span>
-                <span className="font-bold text-emerald-700">Active (Resend)</span>
-              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Shared Care History / Activity Timeline */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6">
+      {/* Audit Log / Collaborative Care Feed */}
+      <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] text-[#1E3A2F] flex items-center justify-center">
-              <Activity className="w-4 h-4 text-[#1E3A2F]" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-[#1E3A2F]">Shared Care History &amp; Audit Trail</h2>
-              <p className="text-xs text-[#5C6460]">Immutable record of all confirmed doses, caretaker follow-ups, and clinical visits</p>
-            </div>
+            <Activity className="w-5 h-5 text-[#607B6E]" />
+            <h2 className="text-base sm:text-lg font-black text-[#1E3A2F]">Collaborative Care Activity Stream</h2>
           </div>
-          <span className="text-xs font-bold text-[#607B6E] bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#EFECE6]">
-            Live Verified Logs
-          </span>
+          <span className="text-xs text-[#5C6460]">Immutable care audit</span>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {activities.length > 0 ? (
             activities.map((act) => (
-              <div key={act.id} className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white border border-[#D5E2D9] flex items-center justify-center text-[#1E3A2F]">
-                    <UserCheck className="w-4 h-4 text-[#607B6E]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-[#1E3A2F]">
-                      {act.action_type.replace(/_/g, " ")}
-                    </p>
-                    <p className="text-[11px] text-[#5C6460]">
-                      Role: <strong className="text-[#1E3A2F]">{act.actor_role}</strong> • {new Date(act.created_at).toLocaleString("en-IN", {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
-                    </p>
-                  </div>
+              <div
+                key={act.id}
+                className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFECE6] flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2 py-0.5 rounded-md bg-[#EBF2EE] text-[#1E3A2F] font-bold text-[10px]">
+                    {act.actor_role}
+                  </span>
+                  <span className="font-extrabold text-[#1E3A2F]">{act.action_type.replace(/_/g, " ")}</span>
                 </div>
-                <span className="text-[11px] font-mono text-[#5C6460] bg-white px-2.5 py-1 rounded-md border border-[#EFECE6]">
-                  {JSON.stringify(act.action_payload).slice(0, 40)}...
+                <span className="text-[11px] text-[#5C6460]">
+                  {new Date(act.created_at).toLocaleTimeString("en-IN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             ))
           ) : (
-            <div className="p-6 text-center text-xs text-[#5C6460] bg-[#FAF8F5] rounded-xl border border-[#EFECE6]">
-              Audit trail initialized. Verified actions from elderly confirmations, caretaker escalations, and appointments will log here automatically.
+            <div className="p-4 text-center text-[#5C6460] text-xs">
+              No recent collaborative care activities recorded yet.
             </div>
           )}
         </div>

@@ -4,6 +4,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export interface AuthenticatedUser {
   id: string;
   email: string;
+  fullName?: string;
+  avatarUrl?: string;
 }
 
 /**
@@ -37,9 +39,15 @@ export async function getAuthUser(): Promise<AuthenticatedUser | null> {
       return null;
     }
 
+    const meta = user.user_metadata || {};
+    const fullName = (meta.full_name || meta.name || "") as string;
+    const avatarUrl = (meta.avatar_url || "") as string;
+
     return {
       id: user.id,
       email: user.email || "",
+      fullName: fullName || undefined,
+      avatarUrl: avatarUrl || undefined,
     };
   } catch (err) {
     console.error("[VATSALYA Session Error]", err);

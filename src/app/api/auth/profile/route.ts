@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth/session";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,20 +15,57 @@ export async function GET() {
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("id, email, full_name, phone, preferred_language, avatar_url, created_at, updated_at")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    return NextResponse.json(
-      { success: false, error: { code: "PROFILE_NOT_FOUND", message: error.message } },
-      { status: 404 }
-    );
+  if (profile) {
+    // If full_name was empty in profile record but available in auth metadata, update it
+    if (!profile.full_name?.trim() && user.fullName) {
+      profile.full_name = user.fullName;
+      const admin = createAdminClient();
+      await admin.from("profiles").update({ full_name: user.fullName }).eq("id", user.id);
+    }
+    return NextResponse.json({ success: true, data: profile }, { status: 200 });
   }
 
-  return NextResponse.json({ success: true, data: profile }, { status: 200 });
+  // Profile row does not exist yet (e.g. freshly created OAuth user)
+  const resolvedName = user.fullName || (user.email ? user.email.split("@")[0] : "Your Account");
+  const admin = createAdminClient();
+  const { data: createdProfile } = await admin
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email,
+        full_name: resolvedName,
+        avatar_url: user.avatarUrl || null,
+        preferred_language: "en",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    )
+    .select()
+    .single();
+
+  return NextResponse.json(
+    {
+      success: true,
+      data: createdProfile || {
+        id: user.id,
+        email: user.email,
+        full_name: resolvedName,
+        phone: null,
+        preferred_language: "en",
+        avatar_url: user.avatarUrl || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    },
+    { status: 200 }
+  );
 }
 
 export async function POST(req: Request) {
@@ -50,8 +88,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
-    const { data: profile, error } = await supabase
+    const admin = createAdminClient();
+    const { data: profile, error } = await admin
       .from("profiles")
       .upsert({
         id: user.id,
