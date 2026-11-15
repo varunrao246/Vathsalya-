@@ -14,6 +14,7 @@ import {
   KeyRound,
   PlusCircle,
   Pill,
+  Bell,
 } from "lucide-react";
 import { signOutUser, isSupabaseConfigured } from "@/lib/auth/auth-client";
 
@@ -141,6 +142,15 @@ export default function DashboardLayout({
               >
                 <KeyRound className="w-3.5 h-3.5" />
                 Members &amp; Passcodes
+              </Link>
+              <Link
+                href="/dashboard/settings/notifications"
+                className={`flex items-center gap-1 hover:text-[#1E3A2F] transition-colors ${
+                  pathname === "/dashboard/settings/notifications" ? "text-[#1E3A2F] font-bold underline underline-offset-4" : "text-[#5C6460]"
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5" />
+                Alerts &amp; Escalation
               </Link>
             </div>
 

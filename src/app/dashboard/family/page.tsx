@@ -316,9 +316,17 @@ export default function FamilyDashboard() {
           </div>
 
           <div className="pt-4 border-t border-[#EFECE6] space-y-3">
-            <h3 className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
-              Notification Status:
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-[#607B6E] uppercase tracking-wider">
+                Notification Channels:
+              </h3>
+              <Link
+                href="/dashboard/settings/notifications"
+                className="text-[11px] font-bold text-[#1E3A2F] hover:underline"
+              >
+                Configure
+              </Link>
+            </div>
             <div className="text-xs text-[#5C6460] space-y-1.5">
               <div className="flex items-center justify-between">
                 <span>Telegram Bot:</span>
@@ -329,8 +337,8 @@ export default function FamilyDashboard() {
                 <span className="font-semibold text-emerald-700">Active (priya@example.com)</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Android App (FCM):</span>
-                <span className="font-semibold text-[#607B6E]">Ready for Device Link</span>
+                <span>Escalation Policy:</span>
+                <span className="font-semibold text-[#1E3A2F]">30m Caretaker • 60m Family</span>
               </div>
             </div>
           </div>

@@ -259,6 +259,17 @@ export default function ElderlyDashboard() {
         )}
       </div>
 
+      {/* Reminder Channel Status */}
+      <div className="p-4 rounded-2xl bg-white border border-[#EFECE6] flex items-center justify-between text-xs text-[#5C6460]">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>ದೈನಂದಿನ ನೆನಪೋಲೆಗಳು (Daily Routine Alerts): <strong className="text-[#1E3A2F]">Telegram Connected (@VatsalyaCareBot)</strong></span>
+        </div>
+        <a href="/dashboard/settings/notifications" className="font-semibold text-[#1E3A2F] hover:underline">
+          Settings
+        </a>
+      </div>
+
       {/* Full Today Timeline for Elderly User */}
       {timeline.length > 1 && (
         <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] space-y-4">

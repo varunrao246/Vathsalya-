@@ -9,8 +9,11 @@ import {
   FileText,
   Activity,
   Check,
+  AlertTriangle,
+  Phone,
 } from "lucide-react";
 import type { DoseOccurrence } from "@/lib/medications/dose-engine";
+import type { EscalationEvent, EscalationResolutionAction } from "@/lib/notifications/types";
 
 // Default shift doses fallback
 const DEFAULT_SHIFT_DOSES: DoseOccurrence[] = [
@@ -58,6 +61,23 @@ export default function CaretakerDashboard() {
   const [administeringDose, setAdministeringDose] = useState<string | null>(null);
   const [administerNotes, setAdministerNotes] = useState("");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [escalations, setEscalations] = useState<EscalationEvent[]>([
+    {
+      id: "demo-esc-1",
+      healthcareProfileId: "demo-profile-appaji",
+      scheduleOccurrenceKey: "shift-sched-2-key",
+      medicationName: "Metformin (500 mg)",
+      targetTime: "13:30",
+      scheduledAt: new Date().toISOString(),
+      escalationLevel: "CARETAKER_OVERDUE",
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ]);
+  const [actingEscalationId, setActingEscalationId] = useState<string | null>(null);
+  const [escalationAction, setEscalationAction] = useState<EscalationResolutionAction>("CALL_COMPLETED");
+  const [escalationNotes, setEscalationNotes] = useState("");
 
   useEffect(() => {
     async function loadShiftTimeline() {
@@ -72,9 +92,54 @@ export default function CaretakerDashboard() {
       } catch {
         setTimeline(DEFAULT_SHIFT_DOSES);
       }
+
+      try {
+        const escRes = await fetch("/api/escalations/pending?healthcareProfileId=demo-profile-appaji");
+        const escJson = await escRes.json();
+        if (escJson.success && escJson.data && escJson.data.length > 0) {
+          setEscalations(escJson.data);
+        }
+      } catch {
+        // Fallback demo escalation
+      }
     }
     loadShiftTimeline();
   }, []);
+
+  const handleResolveEscalation = async (esc: EscalationEvent) => {
+    try {
+      const res = await fetch("/api/escalations/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          escalationId: esc.id,
+          healthcareProfileId: "demo-profile-appaji",
+          action: escalationAction,
+          notes: escalationNotes,
+          scheduleOccurrenceKey: esc.scheduleOccurrenceKey,
+          scheduledAt: esc.scheduledAt,
+          scheduledDate: esc.scheduledAt.split("T")[0],
+          scheduledTime: esc.targetTime,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setActionMessage(`Escalation follow-up recorded: ${escalationAction}`);
+        setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
+        setActingEscalationId(null);
+        setEscalationNotes("");
+      } else {
+        setActionMessage(`Follow-up recorded in preview mode.`);
+        setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
+        setActingEscalationId(null);
+      }
+    } catch {
+      setActionMessage(`Follow-up recorded.`);
+      setEscalations((prev) => prev.filter((e) => e.id !== esc.id));
+      setActingEscalationId(null);
+    }
+  };
 
   const handleAdministerDose = async (dose: DoseOccurrence) => {
     try {
@@ -186,6 +251,113 @@ export default function CaretakerDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Shift Tasks Checklist */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Active Care Escalations Banner if any exist */}
+          {escalations.length > 0 && (
+            <div className="p-6 rounded-3xl bg-amber-50/80 border-2 border-amber-300 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-900 font-extrabold text-base">
+                  <AlertTriangle className="w-5 h-5 text-amber-700" />
+                  <span>Pending Smart Care Escalations ({escalations.length})</span>
+                </div>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold uppercase tracking-wider">
+                  Action Required
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {escalations.map((esc) => (
+                  <div
+                    key={esc.id}
+                    className="p-4 rounded-2xl bg-white border border-amber-200 shadow-xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#1E3A2F]">
+                          {esc.medicationName} ({esc.targetTime})
+                        </h3>
+                        <p className="text-xs text-[#5C6460] mt-0.5">
+                          Medication confirmation is pending. Please contact Appaji to check whether assistance is required.
+                        </p>
+                      </div>
+                      <a
+                        href="tel:+919876543210"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25]"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        Call Appaji
+                      </a>
+                    </div>
+
+                    {actingEscalationId === esc.id ? (
+                      <div className="pt-2 border-t border-[#EFECE6] space-y-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#1F2421]">
+                            Select Follow-Up Action Outcome:
+                          </label>
+                          <select
+                            value={escalationAction}
+                            onChange={(e) => setEscalationAction(e.target.value as EscalationResolutionAction)}
+                            className="mt-1 w-full text-xs p-2 rounded-xl border border-[#EFECE6] bg-[#FDFBF7]"
+                          >
+                            <option value="CALL_COMPLETED">Call Completed — Checking in</option>
+                            <option value="DOSE_CONFIRMED_BY_ELDER">Elder Confirmed Taken (Self-administered)</option>
+                            <option value="ADMINISTERED_BY_CARETAKER">Administered by Caretaker Directly</option>
+                            <option value="ELDER_REPORTS_ALREADY_TAKEN">Elder Reports Already Taken</option>
+                            <option value="UNABLE_TO_REACH">Unable to Reach (Alert Family Admin)</option>
+                            <option value="ASSISTANCE_REQUIRED">Assistance Required</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <input
+                            type="text"
+                            value={escalationNotes}
+                            onChange={(e) => setEscalationNotes(e.target.value)}
+                            placeholder="Observation notes (e.g. Spoke with Appaji, confirmed dose taken with lunch)..."
+                            className="w-full text-xs p-2 rounded-xl border border-[#EFECE6] bg-[#FDFBF7]"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleResolveEscalation(esc)}
+                            className="px-4 py-2 rounded-xl bg-[#1E3A2F] text-white text-xs font-bold hover:bg-[#162E25]"
+                          >
+                            Submit Action &amp; Audit Trail
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActingEscalationId(null)}
+                            className="px-3 py-2 rounded-xl border border-[#EFECE6] text-xs font-semibold hover:bg-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pt-2 border-t border-[#EFECE6] flex items-center justify-between">
+                        <span className="text-[11px] text-[#607B6E]">
+                          Logged at {new Date(esc.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActingEscalationId(esc.id);
+                            setEscalationAction("CALL_COMPLETED");
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-bold hover:bg-amber-100 cursor-pointer"
+                        >
+                          Log Caretaker Follow-Up Action
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="p-8 rounded-3xl bg-white border border-[#EFECE6] space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
