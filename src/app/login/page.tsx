@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -21,25 +21,31 @@ import {
   isSupabaseConfigured,
 } from "@/lib/auth/auth-client";
 
-function LoginForm() {
-  const router = useRouter();
+function UrlParamsReader({
+  onParams,
+}: {
+  onParams: (error: string | null, verified: boolean) => void;
+}) {
   const searchParams = useSearchParams();
 
-  const urlError = searchParams.get("error");
-  const verifiedParam = searchParams.get("verified");
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    const verifiedParam = searchParams.get("verified") === "true";
+    onParams(errorParam ? decodeURIComponent(errorParam) : null, verifiedParam);
+  }, [searchParams, onParams]);
+
+  return null;
+}
+
+export default function LoginPage() {
+  const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(
-    urlError ? decodeURIComponent(urlError) : null
-  );
-  const [successMessage, setSuccessMessage] = useState<string | null>(
-    verifiedParam === "true"
-      ? "Email confirmed successfully! You can now sign in to your account."
-      : null
-  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Resend verification state for unconfirmed users
   const [showResend, setShowResend] = useState(false);
@@ -48,6 +54,15 @@ function LoginForm() {
   const [resendFeedback, setResendFeedback] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
+
+  const handleParams = useCallback((error: string | null, verified: boolean) => {
+    if (error) {
+      setErrorMessage(error);
+    }
+    if (verified) {
+      setSuccessMessage("Email confirmed successfully! You can now sign in to your account.");
+    }
+  }, []);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -116,6 +131,11 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-[#FAF8F5]">
+      {/* Dynamic query param parser isolated inside Suspense */}
+      <Suspense fallback={null}>
+        <UrlParamsReader onParams={handleParams} />
+      </Suspense>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2 mb-6 group">
           <div className="w-12 h-12 rounded-2xl bg-[#0F766E] text-white flex items-center justify-center shadow-xs">
@@ -301,13 +321,13 @@ function LoginForm() {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || googleLoading}
                 className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-[#0F766E] hover:bg-[#0D655E] transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Signing In...</span>
+                    <span>Signing in...</span>
                   </>
                 ) : (
                   <>
@@ -319,44 +339,44 @@ function LoginForm() {
             </div>
           </form>
 
-          {/* Separate Demo Sandbox Entry Point */}
-          <div className="mt-6 pt-6 border-t border-[#E8E2D9]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-[#0F766E] uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
-                Explore Demo (Sample Data)
-              </span>
-              <span className="text-[10px] text-[#57534E] bg-[#F3EDE5] px-2 py-0.5 rounded-full border border-[#E8E2D9]">
-                Evaluation Sandbox
-              </span>
-            </div>
-            <p className="text-[11px] text-[#57534E] mb-3">
-              Fictional demonstration mode for hackathon judges. Explore the three role perspectives without real account sign-in:
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
-              <Link
-                href="/dashboard/elderly"
-                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
-              >
-                Elderly
-              </Link>
-              <Link
-                href="/dashboard/family"
-                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
-              >
-                Family
-              </Link>
-              <Link
-                href="/dashboard/caretaker"
-                className="p-2 rounded-xl bg-[#FAF8F5] border border-[#E8E2D9] text-[#1C1917] hover:border-[#0F766E] hover:bg-white transition-colors"
-              >
-                Caretaker
-              </Link>
+          {/* Quick Demo Access Box for Hackathon Reviewers */}
+          <div className="mt-6 pt-5 border-t border-[#E8E2D9] text-center">
+            <span className="text-[11px] font-bold text-[#57534E] uppercase tracking-wider block mb-2">
+              Hackathon Evaluation
+            </span>
+            <div className="p-3 rounded-2xl bg-[#F3EDE5] border border-[#E8E2D9] text-xs text-[#1C1917]">
+              <div className="flex items-center justify-center gap-1.5 font-bold text-[#0F766E] mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#0F766E]" />
+                <span>Explore Demo (Sample Data)</span>
+              </div>
+              <p className="text-[11px] text-[#57534E] mb-2 leading-relaxed">
+                Test the platform without signing in using pre-configured sample profiles:
+              </p>
+              <div className="flex items-center justify-center gap-2 font-semibold">
+                <Link
+                  href="/dashboard/elderly"
+                  className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
+                >
+                  Elderly
+                </Link>
+                <Link
+                  href="/dashboard/family"
+                  className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
+                >
+                  Family
+                </Link>
+                <Link
+                  href="/dashboard/caretaker"
+                  className="px-2.5 py-1 rounded-lg bg-white text-[#1C1917] hover:text-[#0F766E] border border-[#E8E2D9] shadow-2xs"
+                >
+                  Caretaker
+                </Link>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-[#57534E]">
+          <div className="mt-6 text-center text-xs text-[#57534E]">
+            <p>
               Don&apos;t have an account?{" "}
               <Link href="/register" className="font-bold text-[#0F766E] hover:underline">
                 Create one now
@@ -366,19 +386,5 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5]">
-          <Loader2 className="w-6 h-6 animate-spin text-[#0F766E]" />
-        </div>
-      }
-    >
-      <LoginForm />
-    </Suspense>
   );
 }
