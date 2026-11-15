@@ -1,53 +1,19 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /auth/callback
- * Exchanges the Supabase Auth verification code for an authenticated session.
- * Used for email verification links and OAuth callbacks.
+ * Redirects any legacy or external callback requests to /auth/confirm
+ * preserving all query parameters (code, token_hash, type, error, etc.)
  */
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url);
-  const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") || "/onboard";
-  const error = requestUrl.searchParams.get("error");
-  const errorDescription = requestUrl.searchParams.get("error_description");
+  const confirmUrl = new URL("/auth/confirm", requestUrl.origin);
 
-  // Handle explicit Supabase Auth error redirects
-  if (error) {
-    const loginUrl = new URL("/login", requestUrl.origin);
-    loginUrl.searchParams.set("error", errorDescription || error);
-    return NextResponse.redirect(loginUrl);
-  }
+  requestUrl.searchParams.forEach((val, key) => {
+    confirmUrl.searchParams.set(key, val);
+  });
 
-  if (code) {
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-      if (!exchangeError) {
-        // Verification successful: redirect to onboarding with verified flag
-        const targetUrl = new URL(next, requestUrl.origin);
-        targetUrl.searchParams.set("verified", "true");
-        return NextResponse.redirect(targetUrl);
-      }
-
-      // If code exchange failed (e.g. expired or already used code)
-      const loginUrl = new URL("/login", requestUrl.origin);
-      loginUrl.searchParams.set("error", exchangeError.message);
-      return NextResponse.redirect(loginUrl);
-    } catch (err: unknown) {
-      const loginUrl = new URL("/login", requestUrl.origin);
-      loginUrl.searchParams.set(
-        "error",
-        err instanceof Error ? err.message : "Failed to verify email session"
-      );
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-
-  // Fallback to login if no authorization code is present
-  return NextResponse.redirect(new URL("/login", requestUrl.origin));
+  return NextResponse.redirect(confirmUrl);
 }

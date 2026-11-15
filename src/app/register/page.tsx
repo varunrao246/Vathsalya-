@@ -125,10 +125,10 @@ export default function RegisterPage() {
 
             <div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#1C1917]">
-                Your account has been created!
+                Account created successfully!
               </h1>
               <p className="mt-3 text-sm text-[#57534E] leading-relaxed">
-                Please check your email and verify your address to continue setting up your healthcare profile.
+                Check your inbox and confirm your email address. Once verified, return here and log in.
               </p>
             </div>
 

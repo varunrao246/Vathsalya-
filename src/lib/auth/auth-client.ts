@@ -12,7 +12,10 @@ export function getAppOrigin(): string {
   if (typeof window !== "undefined") {
     return window.location.origin;
   }
-  return process.env.NEXT_PUBLIC_APP_URL || "https://vatsalya-tau.vercel.app";
+  if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes("localhost")) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  return "https://vatsalya-tau.vercel.app";
 }
 
 export async function signInWithEmail(email: string, password: string) {
@@ -62,7 +65,7 @@ export async function signUpWithEmail(
 
   const cleanEmail = email.trim().toLowerCase();
   const origin = getAppOrigin();
-  const emailRedirectTo = metadata.redirectTo || `${origin}/auth/callback?next=/onboard`;
+  const emailRedirectTo = metadata.redirectTo || `${origin}/auth/confirm`;
 
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -103,7 +106,7 @@ export async function resendVerificationEmail(email: string) {
 
   const cleanEmail = email.trim().toLowerCase();
   const origin = getAppOrigin();
-  const emailRedirectTo = `${origin}/auth/callback?next=/onboard`;
+  const emailRedirectTo = `${origin}/auth/confirm`;
 
   const supabase = createClient();
   const { data, error } = await supabase.auth.resend({
