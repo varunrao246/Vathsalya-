@@ -94,7 +94,7 @@ export function Navbar() {
             href="/register"
             className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-bold text-white bg-[#0F766E] rounded-xl hover:bg-[#0D655E] transition-all shadow-xs active:scale-95"
           >
-            <span>Get Started</span>
+            <span>Start a Care Profile</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -163,9 +163,9 @@ export function Navbar() {
             <Link
               href="/register"
               onClick={() => setMobileMenuOpen(false)}
-              className="py-3 text-center text-sm font-bold text-white bg-[#1E3A2F] rounded-xl shadow-xs"
+              className="py-3 text-center text-sm font-bold text-white bg-[#0F766E] rounded-xl shadow-xs"
             >
-              Get Started
+              Start a Care Profile
             </Link>
           </div>
         </div>

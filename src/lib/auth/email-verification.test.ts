@@ -1,6 +1,29 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { getAppOrigin } from "./auth-client";
+import fs from "fs";
+import path from "path";
+
+try {
+  const envPath = path.resolve(process.cwd(), ".env.local");
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, "utf-8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const idx = trimmed.indexOf("=");
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+} catch {
+  // ignore
+}
 
 describe("VATSALYA Email Verification & Session Isolation Suite", () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://lxwpjhgibbygrfouljuq.supabase.co";
@@ -241,5 +264,18 @@ describe("VATSALYA Email Verification & Session Isolation Suite", () => {
     // 3. Verify unrelated client session is completely preserved
     const { data: activeSession } = await unrelatedClient.auth.getSession();
     expect(activeSession.session?.user?.email).toBe(unrelatedEmail);
+  });
+
+  it("checks Google OAuth provider status and handles unconfigured provider safely", async () => {
+    const { isGoogleAuthEnabled, signInWithGoogle } = await import("./auth-client");
+    const enabled = await isGoogleAuthEnabled();
+
+    // In the current Supabase live project, Google OAuth is not yet toggled on
+    expect(typeof enabled).toBe("boolean");
+
+    if (!enabled) {
+      // Must throw friendly explanatory error instead of failing unexpectedly
+      await expect(signInWithGoogle()).rejects.toThrow(/Google Sign-In is not currently enabled/i);
+    }
   });
 });

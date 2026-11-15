@@ -88,6 +88,11 @@ export async function signUpWithEmail(
     if (error.message.includes("Password should be")) {
       throw new Error("Password must be at least 8 characters long.");
     }
+    if (error.message.toLowerCase().includes("rate limit") || (error as { status?: number }).status === 429) {
+      throw new Error(
+        "The built-in email service has reached its hourly quota (3–4 emails/hour). Please wait a while before requesting another email, or explore the platform using the Demo Sandbox."
+      );
+    }
     throw error;
   }
 
@@ -118,8 +123,73 @@ export async function resendVerificationEmail(email: string) {
   });
 
   if (error) {
-    if (error.message.includes("rate limit") || error.status === 429) {
-      throw new Error("Please wait a moment before requesting another confirmation email.");
+    if (error.message.toLowerCase().includes("rate limit") || (error as { status?: number }).status === 429) {
+      throw new Error(
+        "The built-in email service has reached its hourly quota (3–4 emails/hour). Please wait a while before requesting another email, or explore the platform using the Demo Sandbox."
+      );
+    }
+    throw error;
+  }
+
+  return data;
+}
+
+export async function isGoogleAuthEnabled(): Promise<boolean> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder")) {
+      return false;
+    }
+    const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+      headers: { apikey: supabaseAnonKey },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.external?.google);
+  } catch {
+    return false;
+  }
+}
+
+export async function signInWithGoogle() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Supabase credentials are not configured. Please check your configuration."
+    );
+  }
+
+  // Pre-flight check: verify if Google provider is enabled in the live Supabase project
+  const isEnabled = await isGoogleAuthEnabled();
+  if (!isEnabled) {
+    throw new Error(
+      "Google Sign-In is not currently enabled in the Supabase project. To enable it, navigate to Supabase Dashboard -> Authentication -> Providers -> Google, toggle it on, and supply the Google Client ID and Secret. In the meantime, please register or sign in using Email and Password."
+    );
+  }
+
+  const origin = getAppOrigin();
+  const redirectTo = `${origin}/auth/callback?next=/onboard`;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) {
+    if (
+      error.message.toLowerCase().includes("provider is not enabled") ||
+      error.message.toLowerCase().includes("unsupported provider")
+    ) {
+      throw new Error(
+        "Google Sign-In is not currently enabled in the Supabase project. To enable it, navigate to Supabase Dashboard -> Authentication -> Providers -> Google, toggle it on, and supply the Google Client ID and Secret. In the meantime, please register or sign in using Email and Password."
+      );
     }
     throw error;
   }
