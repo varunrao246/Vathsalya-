@@ -5,6 +5,14 @@ import { EscalationEngine } from "@/lib/notifications/escalation-engine";
 export const dynamic = "force-dynamic";
 
 /**
+ * GET /api/jobs/process-notifications
+ * Supports Vercel Cron triggers (which invoke via HTTP GET with Bearer CRON_SECRET).
+ */
+export async function GET(req: Request) {
+  return POST(req);
+}
+
+/**
  * POST /api/jobs/process-notifications
  * Protected scheduled job endpoint triggered by Vercel Cron or Google Cloud Scheduler.
  * Evaluates active medication occurrences in profile timezones and coordinates escalations.
