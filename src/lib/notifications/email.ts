@@ -162,63 +162,14 @@ export function buildEmailTemplate({
 }
 
 /**
- * Sends transactional email via Resend API.
+ * Transactional email via Resend has been retired per project requirements.
+ * Always returns EMAIL_DISABLED to prevent outbound email attempts.
  */
-export async function sendEmail(payload: EmailPayload): Promise<DispatchResult> {
-  const { apiKey, fromEmail } = getResendConfig();
-
-  if (!isResendConfigured() || !apiKey) {
-    return {
-      success: false,
-      channel: "EMAIL",
-      error: "RESEND_NOT_CONFIGURED: Live Resend API key is not configured in environment.",
-    };
-  }
-
-  try {
-    const html = buildEmailTemplate({
-      elderlyName: payload.elderlyName,
-      medicationName: payload.medicationName,
-      scheduledTime: payload.scheduledTime,
-      instructions: payload.instructions,
-      escalationLevel: payload.escalationLevel,
-      actionRequired: payload.actionRequired,
-    });
-
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [payload.to],
-        subject: payload.subject,
-        html,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || data.error) {
-      return {
-        success: false,
-        channel: "EMAIL",
-        error: data.error?.message || `HTTP_${res.status}: Failed to send email via Resend.`,
-      };
-    }
-
-    return {
-      success: true,
-      channel: "EMAIL",
-      providerMessageId: String(data.id || ""),
-    };
-  } catch (err: unknown) {
-    return {
-      success: false,
-      channel: "EMAIL",
-      error: err instanceof Error ? err.message : "NETWORK_ERROR",
-    };
-  }
+export async function sendEmail(..._args: unknown[]): Promise<DispatchResult> {
+  void _args;
+  return {
+    success: false,
+    channel: "EMAIL",
+    error: "EMAIL_DISABLED: Resend has been retired from the notification pipeline per policy.",
+  };
 }

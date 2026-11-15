@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Send,
-  Mail,
   Shield,
   CheckCircle2,
   ExternalLink,
@@ -37,7 +36,6 @@ export default function NotificationSettingsPage() {
 
   // Preference fields
   const [telegramEnabled, setTelegramEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [overdueCaretakerGraceMinutes, setOverdueCaretakerGraceMinutes] = useState(30);
   const [familyEscalationGraceMinutes, setFamilyEscalationGraceMinutes] = useState(60);
@@ -63,7 +61,6 @@ export default function NotificationSettingsPage() {
           const prefJson = await prefRes.json();
           if (prefJson.success && prefJson.data) {
             setTelegramEnabled(prefJson.data.telegramEnabled);
-            setEmailEnabled(prefJson.data.emailEnabled);
             setReminderMinutesBefore(prefJson.data.reminderMinutesBefore);
             setOverdueCaretakerGraceMinutes(prefJson.data.overdueCaretakerGraceMinutes);
             setFamilyEscalationGraceMinutes(prefJson.data.familyEscalationGraceMinutes);
@@ -125,7 +122,7 @@ export default function NotificationSettingsPage() {
         body: JSON.stringify({
           healthcareProfileId: profileId,
           telegramEnabled,
-          emailEnabled,
+          emailEnabled: false,
           reminderMinutesBefore,
           overdueCaretakerGraceMinutes,
           familyEscalationGraceMinutes,
@@ -266,23 +263,37 @@ export default function NotificationSettingsPage() {
             )}
           </div>
 
-          {/* Email Channel Card */}
+          {/* Telegram Interactive Features Info Card */}
           <div className="p-6 rounded-3xl bg-white border border-[#EFECE6] shadow-xs space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-                <Mail className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-[#EBF2EE] text-[#1E3A2F] flex items-center justify-center font-bold">
+                <Send className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#1E3A2F]">Resend Transactional Email</h2>
-                <p className="text-xs text-[#5C6460]">Channel C: reminders@vatsalya.care</p>
+                <h2 className="text-base font-bold text-[#1E3A2F]">Interactive Bot Actions</h2>
+                <p className="text-xs text-[#5C6460]">Real-Time Inline Buttons</p>
               </div>
             </div>
             <p className="text-xs text-[#5C6460] leading-relaxed">
-              Sends accessible, high-contrast HTML emails for scheduled updates and family escalation summaries. Recipient email is verified during account onboarding.
+              Every scheduled reminder sent via Telegram contains instant one-tap buttons:
             </p>
+            <div className="space-y-1.5 text-xs text-[#1E3A2F]">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✅ TAKEN</span>
+                <span className="text-[11px] text-[#5C6460]">Records dose immediately in live timeline.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">⏰ REMIND IN 15M</span>
+                <span className="text-[11px] text-[#5C6460]">Snoozes and sends a follow-up alert.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">🆘 NEED HELP</span>
+                <span className="text-[11px] text-[#5C6460]">Instantly alerts caretakers and family.</span>
+              </div>
+            </div>
             <div className="p-3 rounded-xl bg-[#FDFBF7] border border-[#EFECE6] text-xs text-[#5C6460] flex items-center gap-2">
               <Shield className="w-4 h-4 text-[#607B6E] shrink-0" />
-              <span>Strict Privacy: No sensitive diagnoses in email subject lines.</span>
+              <span>End-to-end encrypted notification channel via Telegram Bot API.</span>
             </div>
           </div>
         </div>
@@ -303,16 +314,6 @@ export default function NotificationSettingsPage() {
                   type="checkbox"
                   checked={telegramEnabled}
                   onChange={(e) => setTelegramEnabled(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#1E3A2F] accent-[#1E3A2F]"
-                />
-              </label>
-
-              <label className="flex items-center justify-between text-xs font-bold text-[#1E3A2F] cursor-pointer">
-                <span>Enable Email Notifications</span>
-                <input
-                  type="checkbox"
-                  checked={emailEnabled}
-                  onChange={(e) => setEmailEnabled(e.target.checked)}
                   className="w-4 h-4 rounded text-[#1E3A2F] accent-[#1E3A2F]"
                 />
               </label>

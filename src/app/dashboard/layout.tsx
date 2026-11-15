@@ -53,8 +53,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       href: pathname.startsWith("/dashboard/elderly")
         ? "/dashboard/elderly"
         : pathname.startsWith("/dashboard/caretaker")
-        ? "/dashboard/caretaker"
-        : "/dashboard/family",
+          ? "/dashboard/caretaker"
+          : "/dashboard/family",
       icon: Users,
     },
     {
@@ -138,33 +138,30 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <nav aria-label="Role Switcher" className="hidden sm:flex items-center gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#EFECE6]">
             <Link
               href={isDemo ? "/dashboard/elderly?demo=true" : "/dashboard/elderly"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                pathname === "/dashboard/elderly"
-                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
-                  : "text-[#5C6460] hover:text-[#1E3A2F]"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${pathname === "/dashboard/elderly"
+                ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
+                : "text-[#5C6460] hover:text-[#1E3A2F]"
+                }`}
             >
               <User className="w-3.5 h-3.5 text-[#607B6E]" />
               <span>Elderly View</span>
             </Link>
             <Link
               href={isDemo ? "/dashboard/family?demo=true" : "/dashboard/family"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                pathname === "/dashboard/family"
-                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
-                  : "text-[#5C6460] hover:text-[#1E3A2F]"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${pathname === "/dashboard/family"
+                ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
+                : "text-[#5C6460] hover:text-[#1E3A2F]"
+                }`}
             >
               <Users className="w-3.5 h-3.5 text-[#607B6E]" />
               <span>Family View</span>
             </Link>
             <Link
               href={isDemo ? "/dashboard/caretaker?demo=true" : "/dashboard/caretaker"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                pathname === "/dashboard/caretaker"
-                  ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
-                  : "text-[#5C6460] hover:text-[#1E3A2F]"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${pathname === "/dashboard/caretaker"
+                ? "bg-white text-[#1E3A2F] shadow-xs border border-[#EFECE6]"
+                : "text-[#5C6460] hover:text-[#1E3A2F]"
+                }`}
             >
               <Stethoscope className="w-3.5 h-3.5 text-[#607B6E]" />
               <span>Caretaker View</span>
@@ -218,11 +215,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <Link
                     key={link.href}
                     href={targetHref}
-                    className={`flex items-center gap-1.5 py-1 transition-colors ${
-                      isActive
-                        ? "text-[#1E3A2F] font-extrabold border-b-2 border-[#1E3A2F]"
-                        : "text-[#5C6460] hover:text-[#1E3A2F]"
-                    }`}
+                    className={`flex items-center gap-1.5 py-1 transition-colors ${isActive
+                      ? "text-[#1E3A2F] font-extrabold border-b-2 border-[#1E3A2F]"
+                      : "text-[#5C6460] hover:text-[#1E3A2F]"
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
                     <span>{link.name}</span>
@@ -258,27 +254,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 href={isDemo ? "/dashboard/elderly?demo=true" : "/dashboard/elderly"}
                 onClick={() => setMobileNavOpen(false)}
-                className={`py-1.5 text-xs font-bold rounded-lg ${
-                  pathname === "/dashboard/elderly" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
-                }`}
+                className={`py-1.5 text-xs font-bold rounded-lg ${pathname === "/dashboard/elderly" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                  }`}
               >
                 Elderly
               </Link>
               <Link
                 href={isDemo ? "/dashboard/family?demo=true" : "/dashboard/family"}
                 onClick={() => setMobileNavOpen(false)}
-                className={`py-1.5 text-xs font-bold rounded-lg ${
-                  pathname === "/dashboard/family" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
-                }`}
+                className={`py-1.5 text-xs font-bold rounded-lg ${pathname === "/dashboard/family" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                  }`}
               >
                 Family
               </Link>
               <Link
                 href={isDemo ? "/dashboard/caretaker?demo=true" : "/dashboard/caretaker"}
                 onClick={() => setMobileNavOpen(false)}
-                className={`py-1.5 text-xs font-bold rounded-lg ${
-                  pathname === "/dashboard/caretaker" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
-                }`}
+                className={`py-1.5 text-xs font-bold rounded-lg ${pathname === "/dashboard/caretaker" ? "bg-white text-[#1E3A2F] shadow-xs" : "text-[#5C6460]"
+                  }`}
               >
                 Caretaker
               </Link>
@@ -294,9 +287,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     key={link.href}
                     href={targetHref}
                     onClick={() => setMobileNavOpen(false)}
-                    className={`flex items-center gap-2.5 p-2 rounded-xl text-xs font-bold ${
-                      isActive ? "bg-[#EBF2EE] text-[#1E3A2F]" : "text-[#5C6460] hover:bg-[#FAF8F5]"
-                    }`}
+                    className={`flex items-center gap-2.5 p-2 rounded-xl text-xs font-bold ${isActive ? "bg-[#EBF2EE] text-[#1E3A2F]" : "text-[#5C6460] hover:bg-[#FAF8F5]"
+                      }`}
                   >
                     <Icon className="w-4 h-4 text-[#607B6E]" />
                     <span>{link.name}</span>

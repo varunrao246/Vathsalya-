@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "../supabase/server";
+import { createAdminClient } from "../supabase/admin";
 import {
   doesScheduleApplyOnDate,
   evaluateDoseOccurrenceStatus,
@@ -6,8 +6,10 @@ import {
   generateDoseOccurrenceKey,
 } from "../medications/dose-engine";
 import { generateNotificationIdempotencyKey } from "./token";
-import { sendTelegramMessage } from "./telegram";
-import { sendEmail } from "./email";
+import {
+  sendTelegramMessage,
+  type TelegramReplyMarkup,
+} from "./telegram";
 import {
   NotificationType,
   DispatchResult,
@@ -53,7 +55,7 @@ export class EscalationEngine {
     escalationEventsTriggered: number;
     results: EscalationEvaluationResult[];
   }> {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createAdminClient();
     const currentTime = options.currentTime || new Date();
     const targetDateStr =
       options.targetDateStr || currentTime.toISOString().split("T")[0];
@@ -75,7 +77,7 @@ export class EscalationEngine {
     let evaluatedOccurrencesCount = 0;
     let notificationsCreatedCount = 0;
     let dispatchedTelegramCount = 0;
-    let dispatchedEmailCount = 0;
+    const dispatchedEmailCount = 0;
     let escalationEventsCount = 0;
     const results: EscalationEvaluationResult[] = [];
 
@@ -90,7 +92,7 @@ export class EscalationEngine {
           profile_id,
           role,
           can_confirm_doses,
-          user:profiles(id, display_name, email, phone)
+          user:profiles(id, full_name, email, phone)
         `)
         .eq("healthcare_profile_id", hp.id)
         .eq("status", "ACTIVE");
@@ -217,40 +219,60 @@ export class EscalationEngine {
           };
 
           // ===================================================================
-          // STAGE 1: UPCOMING REMINDER (to Elderly Person)
+          // STAGE 1: UPCOMING REMINDER (to Elderly Person or Managing Family Admin)
           // ===================================================================
           const reminderNoticeMinutes = sched.reminder_minutes_before || 15;
           // When currentTime is between [scheduledAt - reminderNoticeMinutes] and [scheduledAt]
-          if (diffMinutes >= -reminderNoticeMinutes && diffMinutes < 0 && status === "UPCOMING") {
+          if (diffMinutes >= -reminderNoticeMinutes && diffMinutes <= 0 && (status === "UPCOMING" || status === "DUE")) {
             evalResult.stage = "UPCOMING_REMINDER";
 
-            const elderMember = (members || []).find((m) => m.role === "ELDERLY");
-            if (elderMember) {
-              const pref = getPref(elderMember.profile_id);
-              const elderTg = (telegramLinks || []).find(
-                (t) => t.profile_id === elderMember.profile_id
-              );
-              const elderUser = elderMember.user as unknown as { display_name?: string; email?: string } | null;
+            // Find recipient: Priority 1: ELDERLY, Priority 2: FAMILY_ADMIN, Priority 3: any active member
+            const primaryRecipient =
+              (members || []).find((m) => m.role === "ELDERLY") ||
+              (members || []).find((m) => m.role === "FAMILY_ADMIN") ||
+              (members || [])[0];
 
-              // Channel 1: Telegram
-              if (pref.telegram_enabled && elderTg?.telegram_chat_id) {
+            if (primaryRecipient) {
+              const pref = getPref(primaryRecipient.profile_id);
+              const recipientTg = (telegramLinks || []).find(
+                (t) => t.profile_id === primaryRecipient.profile_id
+              );
+
+              // Channel 1: Telegram with Interactive Inline Buttons
+              if (pref.telegram_enabled && recipientTg?.telegram_chat_id) {
                 const tgKey = generateNotificationIdempotencyKey([
                   hp.id,
                   occurrenceKey,
                   "TELEGRAM",
                   "UPCOMING_DOSE",
-                  elderTg.telegram_chat_id,
+                  recipientTg.telegram_chat_id,
                 ]);
+
+                const messageText = `<b>ನಮಸ್ಕಾರ ${hp.display_name}!</b>\n\nIt is time for your scheduled medication:\n💊 <b>${med.name} (${med.dosage_strength})</b>\n⏰ Scheduled Time: <b>${sched.target_time}</b>\n${med.instructions ? `📝 Note: <i>${med.instructions}</i>\n` : ""}\nPlease confirm after taking your medicine:`;
+
+                const unixSec = Math.floor(scheduledAt.getTime() / 1000);
+                const replyMarkup: TelegramReplyMarkup = {
+                  inline_keyboard: [
+                    [
+                      { text: "✅ TAKEN", callback_data: `T:${sched.id}:${unixSec}` },
+                      { text: "⏰ REMIND IN 15M", callback_data: `S:${sched.id}:${unixSec}` },
+                    ],
+                    [
+                      { text: "🆘 NEED HELP", callback_data: `H:${sched.id}:${unixSec}` },
+                    ],
+                  ],
+                };
 
                 const dispatched = await this.dispatchNotification({
                   supabase,
                   idempotencyKey: tgKey,
                   healthcareProfileId: hp.id,
-                  recipientIdentifier: elderTg.telegram_chat_id,
+                  recipientIdentifier: recipientTg.telegram_chat_id,
                   deliveryChannel: "TELEGRAM",
                   notificationType: "UPCOMING_DOSE",
                   title: `Medication Reminder: ${med.name}`,
-                  message: `<b>ನಮಸ್ಕಾರ ${hp.display_name}!</b>\nUpcoming dose: <b>${med.name} (${med.dosage_strength})</b> at <b>${sched.target_time}</b>.\n${med.instructions || ""}`,
+                  message: messageText,
+                  replyMarkup,
                   dryRun: options.dryRun,
                 });
 
@@ -262,45 +284,6 @@ export class EscalationEngine {
                   evalResult.skippedChannels.push("TELEGRAM_ALREADY_SENT");
                 } else {
                   evalResult.errors.push(`TG_ERROR: ${dispatched.error}`);
-                }
-              }
-
-              // Channel 2: Email
-              if (pref.email_enabled && elderUser?.email) {
-                const emailKey = generateNotificationIdempotencyKey([
-                  hp.id,
-                  occurrenceKey,
-                  "EMAIL",
-                  "UPCOMING_DOSE",
-                  elderUser.email,
-                ]);
-
-                const dispatched = await this.dispatchNotification({
-                  supabase,
-                  idempotencyKey: emailKey,
-                  healthcareProfileId: hp.id,
-                  recipientIdentifier: elderUser.email,
-                  deliveryChannel: "EMAIL",
-                  notificationType: "UPCOMING_DOSE",
-                  title: `VATSALYA Care: Upcoming medication reminder for ${hp.display_name}`,
-                  message: `Scheduled dose: ${med.name} (${med.dosage_strength}) at ${sched.target_time}.`,
-                  emailPayload: {
-                    to: elderUser.email,
-                    subject: `VATSALYA Care Reminder: Scheduled dose for ${hp.display_name}`,
-                    elderlyName: hp.display_name,
-                    medicationName: `${med.name} (${med.dosage_strength})`,
-                    scheduledTime: sched.target_time,
-                    instructions: med.instructions || undefined,
-                  },
-                  dryRun: options.dryRun,
-                });
-
-                if (dispatched.success) {
-                  evalResult.dispatchedChannels.push("EMAIL_ELDERLY");
-                  dispatchedEmailCount++;
-                  notificationsCreatedCount++;
-                } else if (dispatched.error === "ALREADY_SENT") {
-                  evalResult.skippedChannels.push("EMAIL_ALREADY_SENT");
                 }
               }
             }
@@ -323,7 +306,6 @@ export class EscalationEngine {
               const caretakerTg = (telegramLinks || []).find(
                 (t) => t.profile_id === caretaker.profile_id
               );
-              const caretakerUser = caretaker.user as unknown as { display_name?: string; email?: string } | null;
 
               // Ensure escalation_events record exists
               if (!options.dryRun) {
@@ -353,6 +335,16 @@ export class EscalationEngine {
                   caretakerTg.telegram_chat_id,
                 ]);
 
+                const unixSec = Math.floor(scheduledAt.getTime() / 1000);
+                const caretakerReplyMarkup: TelegramReplyMarkup = {
+                  inline_keyboard: [
+                    [
+                      { text: "✅ ADMINISTERED", callback_data: `T:${sched.id}:${unixSec}` },
+                      { text: "📞 CHECKED ON PATIENT", callback_data: `S:${sched.id}:${unixSec}` },
+                    ],
+                  ],
+                };
+
                 const dispatched = await this.dispatchNotification({
                   supabase,
                   idempotencyKey: tgKey,
@@ -361,7 +353,8 @@ export class EscalationEngine {
                   deliveryChannel: "TELEGRAM",
                   notificationType: "OVERDUE_DOSE",
                   title: `Care Alert: ${hp.display_name} medication pending`,
-                  message: `⚠️ <b>VATSALYA Care Alert</b>\n\n<b>${hp.display_name}'s</b> ${sched.target_time} medication (<b>${med.name}</b>) confirmation is pending.\n\nPlease contact them to check whether assistance is required.`,
+                  message: `⚠️ <b>VATSALYA Care Alert</b>\n\n<b>${hp.display_name}'s</b> ${sched.target_time} medication (<b>${med.name}</b>) confirmation is pending.\n\nPlease contact them or check whether assistance is required.`,
+                  replyMarkup: caretakerReplyMarkup,
                   dryRun: options.dryRun,
                 });
 
@@ -371,44 +364,6 @@ export class EscalationEngine {
                   notificationsCreatedCount++;
                 } else if (dispatched.error === "ALREADY_SENT") {
                   evalResult.skippedChannels.push("TELEGRAM_CARETAKER_ALREADY_SENT");
-                }
-              }
-
-              // Email Dispatch
-              if (pref.email_enabled && caretakerUser?.email) {
-                const emailKey = generateNotificationIdempotencyKey([
-                  hp.id,
-                  occurrenceKey,
-                  "EMAIL",
-                  "OVERDUE_DOSE",
-                  caretakerUser.email,
-                ]);
-
-                const dispatched = await this.dispatchNotification({
-                  supabase,
-                  idempotencyKey: emailKey,
-                  healthcareProfileId: hp.id,
-                  recipientIdentifier: caretakerUser.email,
-                  deliveryChannel: "EMAIL",
-                  notificationType: "OVERDUE_DOSE",
-                  title: `VATSALYA Care Alert: ${hp.display_name} medication pending`,
-                  message: `Medication confirmation is pending for ${hp.display_name}.`,
-                  emailPayload: {
-                    to: caretakerUser.email,
-                    subject: `VATSALYA Care Alert: Medication update for ${hp.display_name}`,
-                    elderlyName: hp.display_name,
-                    medicationName: `${med.name} (${med.dosage_strength})`,
-                    scheduledTime: sched.target_time,
-                    escalationLevel: "CARETAKER_OVERDUE",
-                    actionRequired: `${hp.display_name}'s ${sched.target_time} medication has not been confirmed. Please contact them and check whether assistance is required.`,
-                  },
-                  dryRun: options.dryRun,
-                });
-
-                if (dispatched.success) {
-                  evalResult.dispatchedChannels.push("EMAIL_CARETAKER");
-                  dispatchedEmailCount++;
-                  notificationsCreatedCount++;
                 }
               }
             }
@@ -440,7 +395,6 @@ export class EscalationEngine {
               const adminTg = (telegramLinks || []).find(
                 (t) => t.profile_id === admin.profile_id
               );
-              const adminUser = admin.user as unknown as { display_name?: string; email?: string } | null;
 
               if (!options.dryRun) {
                 await supabase.from("escalation_events").upsert(
@@ -468,6 +422,16 @@ export class EscalationEngine {
                   adminTg.telegram_chat_id,
                 ]);
 
+                const unixSec = Math.floor(scheduledAt.getTime() / 1000);
+                const familyReplyMarkup: TelegramReplyMarkup = {
+                  inline_keyboard: [
+                    [
+                      { text: "✅ MARK TAKEN", callback_data: `T:${sched.id}:${unixSec}` },
+                      { text: "📞 CHECKED IN", callback_data: `S:${sched.id}:${unixSec}` },
+                    ],
+                  ],
+                };
+
                 const dispatched = await this.dispatchNotification({
                   supabase,
                   idempotencyKey: tgKey,
@@ -477,50 +441,13 @@ export class EscalationEngine {
                   notificationType: "ESCALATION_ALERT",
                   title: `Family Escalation Alert: ${hp.display_name}`,
                   message: `📢 <b>VATSALYA Family Care Update</b>\n\n<b>${hp.display_name}'s</b> ${sched.target_time} medication (<b>${med.name}</b>) confirmation is pending.\n\nCaretaker follow-up was initiated. Please review the dashboard timeline for current status.`,
+                  replyMarkup: familyReplyMarkup,
                   dryRun: options.dryRun,
                 });
 
                 if (dispatched.success) {
                   evalResult.dispatchedChannels.push("TELEGRAM_FAMILY_ADMIN");
                   dispatchedTelegramCount++;
-                  notificationsCreatedCount++;
-                }
-              }
-
-              // Email Dispatch
-              if (pref.email_enabled && adminUser?.email) {
-                const emailKey = generateNotificationIdempotencyKey([
-                  hp.id,
-                  occurrenceKey,
-                  "EMAIL",
-                  "ESCALATION_ALERT",
-                  adminUser.email,
-                ]);
-
-                const dispatched = await this.dispatchNotification({
-                  supabase,
-                  idempotencyKey: emailKey,
-                  healthcareProfileId: hp.id,
-                  recipientIdentifier: adminUser.email,
-                  deliveryChannel: "EMAIL",
-                  notificationType: "ESCALATION_ALERT",
-                  title: `VATSALYA Family Escalation: ${hp.display_name} medication pending`,
-                  message: `Medication confirmation is pending for ${hp.display_name}.`,
-                  emailPayload: {
-                    to: adminUser.email,
-                    subject: `VATSALYA Family Care Alert: Follow-up update for ${hp.display_name}`,
-                    elderlyName: hp.display_name,
-                    medicationName: `${med.name} (${med.dosage_strength})`,
-                    scheduledTime: sched.target_time,
-                    escalationLevel: "FAMILY_ADMIN_ALERT",
-                    actionRequired: `${hp.display_name}'s ${sched.target_time} medication confirmation is pending. Caretaker was notified. Please check in with Appaji.`,
-                  },
-                  dryRun: options.dryRun,
-                });
-
-                if (dispatched.success) {
-                  evalResult.dispatchedChannels.push("EMAIL_FAMILY_ADMIN");
-                  dispatchedEmailCount++;
                   notificationsCreatedCount++;
                 }
               }
@@ -558,7 +485,7 @@ export class EscalationEngine {
     notificationType,
     title,
     message,
-    emailPayload,
+    replyMarkup,
     dryRun,
   }: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -570,6 +497,7 @@ export class EscalationEngine {
     notificationType: NotificationType;
     title: string;
     message: string;
+    replyMarkup?: TelegramReplyMarkup;
     emailPayload?: {
       to: string;
       subject: string;
@@ -658,13 +586,13 @@ export class EscalationEngine {
     let dispatchResult: DispatchResult;
 
     if (deliveryChannel === "TELEGRAM") {
-      dispatchResult = await sendTelegramMessage(recipientIdentifier, message);
+      dispatchResult = await sendTelegramMessage(recipientIdentifier, message, {
+        parseMode: "HTML",
+        replyMarkup,
+      });
     } else {
-      if (emailPayload) {
-        dispatchResult = await sendEmail(emailPayload);
-      } else {
-        dispatchResult = { success: false, channel: "EMAIL", error: "MISSING_EMAIL_PAYLOAD" };
-      }
+      // Email is disabled per user requirements (Resend removed)
+      dispatchResult = { success: false, channel: "EMAIL", error: "EMAIL_DISABLED" };
     }
 
     // 3. Update status based on provider response
